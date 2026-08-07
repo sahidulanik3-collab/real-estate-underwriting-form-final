@@ -146,13 +146,24 @@ $('opUpdateBtn').addEventListener('click', () => setOp('update'));
    ================================================================ */
 async function loadDeals() {
   let fetched = [];
-  try {
-    const r = await fetch(S.cfg.getDealsUrl, { headers: { 'Accept': 'application/json' } });
-    if (r.ok) {
-      const d = await r.json();
-      fetched = normalizeDeals(d);
+  const targetUrl = S.cfg.getDealsUrl || S.cfg.sheetUrl;
+
+  if (targetUrl) {
+    try {
+      // Check if URL is a Google Sheet URL
+      if (targetUrl.includes('docs.google.com/spreadsheets')) {
+        fetched = await fetchGoogleSheetCsv(targetUrl);
+      } else {
+        const r = await fetch(targetUrl, { headers: { 'Accept': 'application/json' } });
+        if (r.ok) {
+          const d = await r.json();
+          fetched = normalizeDeals(d);
+        }
+      }
+    } catch (e) {
+      console.warn('Network fetch error, falling back to local deals:', e);
     }
-  } catch (e) { /* fallback to local */ }
+  }
 
   const local = getLocalDeals();
   const map = new Map();
@@ -163,6 +174,64 @@ async function loadDeals() {
   updateDealSelect();
   updateStats();
   if (S.view === 'deals') renderDeals();
+}
+
+/* Parse Google Sheet CSV Directly */
+async function fetchGoogleSheetCsv(url) {
+  let csvUrl = url;
+  // Convert standard Google Sheet URL to CSV export URL if needed
+  if (!url.includes('output=csv') && !url.includes('/export?format=csv')) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv`;
+    }
+  }
+
+  const res = await fetch(csvUrl);
+  if (!res.ok) return [];
+  const text = await res.text();
+  return parseCsvToDeals(text);
+}
+
+function parseCsvToDeals(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvRow(lines[0]).map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+  const deals = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCsvRow(lines[i]);
+    if (row.length === 0) continue;
+    const deal = {};
+    headers.forEach((h, idx) => {
+      let val = row[idx] ? row[idx].trim() : '';
+      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+      deal[h] = val;
+    });
+    if (!deal.deal_id) deal.deal_id = 'DEAL-GS-' + (i);
+    deals.push(deal);
+  }
+  return deals;
+}
+
+function parseCsvRow(rowStr) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < rowStr.length; i++) {
+    const char = rowStr[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 function normalizeDeals(data) {
@@ -597,14 +666,28 @@ $('testConnBtn').addEventListener('click', async () => {
   const el = $('testResult');
   el.style.display = '';
   el.className = 'test-result';
-  el.textContent = 'Testing…';
+  el.textContent = 'Testing connection…';
+  const targetUrl = S.cfg.getDealsUrl || S.cfg.sheetUrl;
+
+  if (!targetUrl) {
+    el.className = 'test-result test-result--err';
+    el.textContent = '⚠ Please enter a Get Deals URL or Google Sheet URL first.';
+    return;
+  }
+
   try {
-    const r = await fetch(S.cfg.getDealsUrl, { method: 'GET' });
-    el.className = r.ok ? 'test-result test-result--ok' : 'test-result test-result--err';
-    el.textContent = r.ok ? `✓ Connected — HTTP ${r.status}` : `⚠ Server responded HTTP ${r.status}`;
+    if (targetUrl.includes('docs.google.com/spreadsheets')) {
+      const deals = await fetchGoogleSheetCsv(targetUrl);
+      el.className = 'test-result test-result--ok';
+      el.textContent = `✓ Google Sheet Connected — Successfully fetched ${deals.length} deals from sheet!`;
+    } else {
+      const r = await fetch(targetUrl, { method: 'GET' });
+      el.className = r.ok ? 'test-result test-result--ok' : 'test-result test-result--err';
+      el.textContent = r.ok ? `✓ Connected to n8n Webhook — HTTP ${r.status}` : `⚠ Webhook returned HTTP ${r.status}`;
+    }
   } catch (e) {
     el.className = 'test-result test-result--err';
-    el.textContent = `✖ Connection failed: ${e.message}. Local storage fallback is active.`;
+    el.textContent = `✖ Connection failed: ${e.message}. (Note: n8n test webhooks expire or require active CORS). Local storage fallback is active.`;
   }
 });
 
