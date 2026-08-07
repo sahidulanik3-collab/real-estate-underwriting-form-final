@@ -410,6 +410,16 @@ function buildPayload() {
     const el = $(f.id); if (!el) return;
     p[f.k] = f.numType === 'num' ? getNum(el) : el.value.trim();
   });
+
+  // Pre-calculate financial summary fields for Google Sheets / n8n
+  const lc = Number(p.land_cost || 0);
+  const cc = Number(p.construction_cost || 0);
+  const oc = Number(p.other_cost || 0);
+  const rev = Number(p.expected_revenue || 0);
+  p.total_cost = lc + cc + oc;
+  p.net_spread = rev - p.total_cost;
+  p.roi_percent = p.total_cost > 0 ? Number(((p.net_spread / p.total_cost) * 100).toFixed(2)) : 0;
+
   return p;
 }
 
@@ -426,9 +436,18 @@ $('dealForm').addEventListener('submit', async (ev) => {
 
   let ok = false;
   try {
-    const r = await fetch(S.cfg.submitUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const r = await fetch(S.cfg.submitUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
     if (r.ok) ok = true;
-  } catch (e) { /* offline fallback */ }
+  } catch (e) {
+    console.warn('Submit fetch error:', e);
+  }
 
   saveLocalDeal(payload);
   S.submitting = false;
@@ -436,7 +455,7 @@ $('dealForm').addEventListener('submit', async (ev) => {
   $('loadingOverlay').style.display = 'none';
   localStorage.removeItem(STORAGE.DRAFT);
 
-  toast(ok ? `Deal ${payload.deal_id} submitted!` : `Deal ${payload.deal_id} saved locally!`, 'ok');
+  toast(ok ? `Deal ${payload.deal_id} submitted to n8n!` : `Deal ${payload.deal_id} saved locally!`, 'ok');
   $('dealForm').reset();
   clearAllErr();
   setOp('new');
