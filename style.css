@@ -267,12 +267,97 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 28px 0 20px;
+  padding: 28px 0 16px;
   flex-wrap: wrap;
   gap: 12px;
 }
 .form-header__title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .form-header__actions { display: flex; gap: 6px; }
+
+/* Operation Bar */
+.op-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+
+.op-toggle {
+  display: inline-flex;
+  background: var(--surface-2);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  gap: 2px;
+}
+
+.op-btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.op-btn:hover { color: var(--text); }
+.op-btn.is-active {
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: var(--shadow);
+}
+[data-theme="dark"] .op-btn.is-active { color: var(--gold); }
+
+.op-deal-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 420px;
+}
+.op-deal-select label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.op-deal-select select {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.op-auto-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.op-auto-id__label { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.op-auto-id__badge {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--gold-light);
+  color: var(--navy);
+  border: 1px solid rgba(200,164,78,.3);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+}
 
 .form-section {
   background: var(--surface);

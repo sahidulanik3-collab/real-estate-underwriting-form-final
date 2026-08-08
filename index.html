@@ -64,11 +64,29 @@
   <!-- Deal Form -->
   <div class="container">
     <div class="form-header">
-      <h2 class="form-header__title">New Deal Submission</h2>
+      <h2 class="form-header__title" id="formHeaderTitle">New Deal Submission</h2>
       <div class="form-header__actions">
         <button class="btn btn--ghost" id="quickFillBtn">⚡ Sample Data</button>
         <button class="btn btn--ghost" id="clearFormBtn">✕ Clear</button>
         <button class="btn btn--ghost" id="editSectionsBtn">✎ Edit Sections</button>
+      </div>
+    </div>
+
+    <!-- Operation Switch & Deal Selector Bar -->
+    <div class="op-bar">
+      <div class="op-toggle">
+        <button class="op-btn is-active" id="opNewBtn" type="button">✨ New Deal</button>
+        <button class="op-btn" id="opUpdateBtn" type="button">✏️ Update Existing Deal</button>
+      </div>
+      <div class="op-deal-select" id="opDealSelectWrap" style="display: none;">
+        <label for="dealIdSelect">Select Deal to Update:</label>
+        <select id="dealIdSelect" class="field-select">
+          <option value="">Loading deals…</option>
+        </select>
+      </div>
+      <div class="op-auto-id" id="opAutoIdWrap">
+        <span class="op-auto-id__label">Assigned Deal ID:</span>
+        <span class="op-auto-id__badge" id="nextDealIdBadge">DEAL-001</span>
       </div>
     </div>
 

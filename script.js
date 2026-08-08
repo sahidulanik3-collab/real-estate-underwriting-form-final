@@ -8,6 +8,7 @@ const SYM = { BDT: '৳', USD: '$', EUR: '€', GBP: '£' };
 
 const S = {
   view: 'dashboard',
+  op: 'new', // 'new' or 'update'
   deals: [],
   submitting: false,
   currentDeal: null,
@@ -420,6 +421,8 @@ async function loadDeals(showToast = false) {
   S.deals = Array.from(map.values());
 
   updateStats();
+  updateNextDealId();
+  if (S.op === 'update') updateDealSelect();
   if (S.view === 'deals') renderDeals();
   if (S.view === 'reports') renderReports();
 
@@ -436,6 +439,98 @@ function saveLocalDeal(d) {
   if (idx >= 0) list[idx] = d; else list.unshift(d);
   localStorage.setItem(STORAGE.DEALS, JSON.stringify(list));
 }
+
+/* ================================================================
+   OPERATION TOGGLE & AUTO DEAL ID
+   ================================================================ */
+function setOp(op) {
+  S.op = op;
+  $('opNewBtn').classList.toggle('is-active', op === 'new');
+  $('opUpdateBtn').classList.toggle('is-active', op === 'update');
+  $('opDealSelectWrap').style.display = op === 'update' ? 'flex' : 'none';
+  $('opAutoIdWrap').style.display = op === 'new' ? 'flex' : 'none';
+  $('formHeaderTitle').textContent = op === 'update' ? 'Update Existing Deal' : 'New Deal Submission';
+
+  if (op === 'new') {
+    $('dealForm').reset();
+    updateLiveCalc();
+    updateNextDealId();
+  } else {
+    updateDealSelect();
+  }
+}
+
+$('opNewBtn').addEventListener('click', () => setOp('new'));
+$('opUpdateBtn').addEventListener('click', () => setOp('update'));
+
+function getNextDealId() {
+  if (!S.deals || S.deals.length === 0) return 'DEAL-001';
+
+  let maxNum = 0;
+  let prefix = 'DEAL-';
+  let padLen = 3;
+
+  S.deals.forEach(d => {
+    if (!d.deal_id) return;
+    const match = d.deal_id.match(/(DEAL[-_]?|GS[-_]?)?(\d+)/i);
+    if (match) {
+      if (match[1]) prefix = match[1].toUpperCase();
+      const num = parseInt(match[2], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+        padLen = Math.max(padLen, match[2].length);
+      }
+    }
+  });
+
+  const nextNum = maxNum + 1;
+  const numStr = String(nextNum).padStart(padLen, '0');
+  return `${prefix.endsWith('-') || prefix.endsWith('_') ? prefix : 'DEAL-'}${numStr}`;
+}
+
+function updateNextDealId() {
+  const badge = $('nextDealIdBadge');
+  if (badge) badge.textContent = getNextDealId();
+}
+
+function updateDealSelect() {
+  const sel = $('dealIdSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (S.deals.length === 0) {
+    sel.innerHTML = '<option value="">No deals found</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">Select a deal to populate…</option>';
+  S.deals.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.deal_id;
+    opt.textContent = `${d.deal_id} — ${d.project_name || 'Untitled'}`;
+    sel.appendChild(opt);
+  });
+}
+
+$('dealIdSelect').addEventListener('change', (e) => {
+  const dealId = e.target.value;
+  if (!dealId) return;
+  const deal = S.deals.find(x => x.deal_id === dealId);
+  if (!deal) return;
+
+  // Auto-populate form fields with existing deal data
+  S.sections.forEach(sec => sec.fields.forEach(f => {
+    const el = $('f_' + f.key);
+    if (!el) return;
+    const val = deal[f.key] || deal[f.key.replace(/_/g, '')] || '';
+    if (f.type === 'number') {
+      el.value = fmtCommas(rawNum(val));
+    } else {
+      el.value = val;
+    }
+  }));
+
+  updateLiveCalc();
+  toast(`Loaded data for ${dealId}`, 'ok');
+});
 
 /* ================================================================
    REFRESH BUTTON
@@ -492,12 +587,23 @@ $('clearFormBtn').addEventListener('click', () => {
    BUILD PAYLOAD & SUBMIT
    ================================================================ */
 function buildPayload() {
-  const p = { deal_id: 'DEAL-' + Date.now().toString().slice(-6), submitted_at: new Date().toISOString() };
+  const p = {
+    operation: S.op,
+    submitted_at: new Date().toISOString()
+  };
+
+  if (S.op === 'update') {
+    p.deal_id = $('dealIdSelect').value || getNextDealId();
+  } else {
+    p.deal_id = getNextDealId();
+  }
+
   S.sections.forEach(sec => sec.fields.forEach(f => {
     const el = $('f_' + f.key);
     if (!el) return;
     p[f.key] = f.type === 'number' ? rawNum(el.value) : el.value.trim();
   }));
+
   // Pre-calc
   const lc = cleanNum(p.land_cost), cc = cleanNum(p.construction_cost), oc = cleanNum(p.other_cost);
   const rev = cleanNum(p.expected_revenue);
