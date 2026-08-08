@@ -1,106 +1,83 @@
 'use strict';
 
 /* ================================================================
-   CONFIG & STORAGE
+   STATE & STORAGE
    ================================================================ */
-const STORAGE = { DEALS: 'mcp_deals_v3', SETTINGS: 'mcp_cfg_v3', DRAFT: 'mcp_draft_v3', THEME: 'mcp_theme' };
-
-const DEFAULTS = {
-  submitUrl: 'https://n8n-scad.srv1492862.hstgr.cloud/webhook/19ee0d89-5430-444d-b1a7-a3493220a483',
-  getDealsUrl: 'https://n8n-scad.srv1492862.hstgr.cloud/webhook/get-deals',
-  sheetUrl: '',
-};
-
+const STORAGE = { DEALS: 'mc_deals_v4', THEME: 'mc_theme', SECTIONS: 'mc_sections_v3' };
 const SYM = { BDT: '৳', USD: '$', EUR: '€', GBP: '£' };
 
-/* ================================================================
-   STATE
-   ================================================================ */
 const S = {
   view: 'dashboard',
-  op: 'new',
   deals: [],
-  cfg: { ...DEFAULTS },
   submitting: false,
   currentDeal: null,
+  sections: null, // form section config
 };
 
 /* ================================================================
-   FIELD DEFINITIONS
+   DEFAULT FORM SECTIONS (editable by user)
    ================================================================ */
-const FIELDS = [
-  { k:'project_name',       id:'projectName',       req:true,  sec:'project', numType:null },
-  { k:'developer_name',     id:'developerName',     req:true,  sec:'project', numType:null },
-  { k:'location',           id:'location',          req:true,  sec:'project', numType:null },
-  { k:'district',           id:'district',          req:true,  sec:'project', numType:null },
-  { k:'project_type',       id:'projectType',       req:true,  sec:'project', numType:null },
-  { k:'priority',           id:'priority',          req:true,  sec:'project', numType:null },
-  { k:'land_area',          id:'landArea',          req:true,  sec:'project', numType:'num' },
-  { k:'floors',             id:'floors',            req:true,  sec:'project', numType:'num' },
-  { k:'project_duration',   id:'projectDuration',   req:true,  sec:'project', numType:'num' },
-  { k:'currency',           id:'currency',          req:true,  sec:'financial', numType:null },
-  { k:'land_cost',          id:'landCost',          req:true,  sec:'financial', numType:'num' },
-  { k:'construction_cost',  id:'constructionCost',  req:true,  sec:'financial', numType:'num' },
-  { k:'other_cost',         id:'otherCost',         req:false, sec:'financial', numType:'num' },
-  { k:'expected_revenue',   id:'expectedRevenue',   req:true,  sec:'financial', numType:'num' },
-  { k:'expected_sales',     id:'expectedSales',     req:true,  sec:'financial', numType:'num' },
-  { k:'expected_rental_income', id:'expectedRentalIncome', req:false, sec:'financial', numType:'num' },
-  { k:'expected_exit_value',id:'expectedExitValue', req:true,  sec:'financial', numType:'num' },
-  { k:'construction_start', id:'constructionStart', req:true,  sec:'details', numType:null },
-  { k:'construction_end',   id:'constructionEnd',   req:true,  sec:'details', numType:null },
-  { k:'funding_type',       id:'fundingType',       req:true,  sec:'details', numType:null },
-  { k:'land_ownership',     id:'landOwnership',     req:true,  sec:'details', numType:null },
-  { k:'developer_experience', id:'developerExperience', req:true, sec:'details', numType:null },
-  { k:'legal_status',       id:'legalStatus',       req:true,  sec:'risk', numType:null },
-  { k:'site_condition',     id:'siteCondition',     req:true,  sec:'risk', numType:null },
-  { k:'environmental_risk', id:'environmentalRisk', req:true,  sec:'risk', numType:null },
-  { k:'market_demand',      id:'marketDemand',      req:true,  sec:'risk', numType:null },
-  { k:'competition_level',  id:'competitionLevel',  req:true,  sec:'risk', numType:null },
-  { k:'notes',              id:'notes',             req:false, sec:'notes', numType:null },
+const DEFAULT_SECTIONS = [
+  {
+    id: 'project', title: 'Project Information', num: '01',
+    fields: [
+      { key: 'project_name', label: 'Project Name', type: 'text', placeholder: 'e.g. Grand Horizon Tower' },
+      { key: 'developer_name', label: 'Developer Name', type: 'text', placeholder: 'e.g. Apex Developments' },
+      { key: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Banani, Dhaka' },
+      { key: 'property_type', label: 'Property Type', type: 'select', options: ['','Residential','Commercial','Mixed-Use','Industrial','Hospitality','Land Development'] },
+      { key: 'land_area', label: 'Land Area (sqft)', type: 'number', placeholder: '0' },
+      { key: 'floors', label: 'Floors', type: 'number', placeholder: '0' },
+      { key: 'project_duration', label: 'Duration (months)', type: 'number', placeholder: '0' },
+    ]
+  },
+  {
+    id: 'financial', title: 'Financial Information', num: '02',
+    fields: [
+      { key: 'land_cost', label: 'Land Cost', type: 'number', placeholder: '0' },
+      { key: 'construction_cost', label: 'Construction Cost', type: 'number', placeholder: '0' },
+      { key: 'other_cost', label: 'Other Costs', type: 'number', placeholder: '0' },
+      { key: 'expected_revenue', label: 'Expected Revenue', type: 'number', placeholder: '0' },
+      { key: 'expected_sales', label: 'Expected Sales', type: 'number', placeholder: '0' },
+    ],
+    hasLiveCalc: true
+  },
+  {
+    id: 'details', title: 'Project Details', num: '03',
+    fields: [
+      { key: 'status', label: 'Status', type: 'select', options: ['','NEW','In Progress','Under Review','Approved','Rejected'] },
+      { key: 'construction_start', label: 'Start Date', type: 'date' },
+      { key: 'construction_end', label: 'End Date', type: 'date' },
+      { key: 'funding_type', label: 'Funding Type', type: 'select', options: ['','Self-funded','Bank Loan','Joint Venture','Private Equity','Mixed'] },
+    ]
+  },
+  {
+    id: 'notes', title: 'Notes & Additional Info', num: '04',
+    fields: [
+      { key: 'notes', label: 'Additional Notes', type: 'textarea', placeholder: 'Any context, caveats, comparable deals…' },
+    ]
+  },
 ];
 
 /* ================================================================
-   DOM
+   UTILITY
    ================================================================ */
-const $ = (id) => document.getElementById(id);
-const $$ = (sel) => document.querySelectorAll(sel);
+const $ = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
 
-/* ================================================================
-   UTILITY: NUMBER FORMATTING
-   ================================================================ */
-function rawNum(v) {
-  if (!v) return '';
-  let c = String(v).replace(/[^0-9.]/g, '');
-  const p = c.split('.');
-  if (p.length > 2) c = p[0] + '.' + p.slice(1).join('');
-  return c;
-}
+function rawNum(v) { if (!v) return ''; return String(v).replace(/[^0-9.]/g, ''); }
 function fmtCommas(v) {
   if (!v) return '';
-  const [i, d] = v.split('.');
+  const [i, d] = String(v).split('.');
   const t = i.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return d !== undefined ? `${t || '0'}.${d}` : t;
 }
-function getNum(el) { return rawNum(el.value); }
 function fmtMoney(n) {
   if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
   if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
   if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
-  return '$' + n;
+  return '$' + Math.round(n);
 }
-
-function attachNumericFormatting() {
-  $$('input[data-numeric]').forEach((inp) => {
-    inp.addEventListener('input', () => {
-      const caret = inp.value.length - inp.selectionStart;
-      const formatted = fmtCommas(rawNum(inp.value));
-      inp.value = formatted;
-      inp.setSelectionRange(Math.max(0, formatted.length - caret), Math.max(0, formatted.length - caret));
-      updateLiveSummary();
-    });
-    inp.addEventListener('blur', () => { inp.value = fmtCommas(rawNum(inp.value)); });
-  });
-}
+function cleanNum(str) { return Number(String(str || '0').replace(/[^0-9.]/g, '')) || 0; }
 
 /* ================================================================
    NAVIGATION
@@ -113,139 +90,346 @@ function switchView(name) {
   if (name === 'reports') renderReports();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
 $$('.nav__btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 $('gotoNewDealBtn').addEventListener('click', () => switchView('dashboard'));
 
 /* ================================================================
    THEME
    ================================================================ */
-function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  localStorage.setItem(STORAGE.THEME, t);
-}
+function setTheme(t) { document.documentElement.dataset.theme = t; localStorage.setItem(STORAGE.THEME, t); }
 $('themeBtn').addEventListener('click', () => {
   setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
 
 /* ================================================================
-   OPERATION TOGGLE
+   RENDER FORM SECTIONS (Dynamic / Editable)
    ================================================================ */
-function setOp(op) {
-  S.op = op;
-  $('opNewBtn').classList.toggle('is-active', op === 'new');
-  $('opUpdateBtn').classList.toggle('is-active', op === 'update');
-  $('dealIdSection').style.display = op === 'update' ? '' : 'none';
-  if (op === 'update' && S.deals.length === 0) loadDeals();
+function loadSections() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE.SECTIONS));
+    S.sections = saved && saved.length > 0 ? saved : JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+  } catch { S.sections = JSON.parse(JSON.stringify(DEFAULT_SECTIONS)); }
 }
-$('opNewBtn').addEventListener('click', () => setOp('new'));
-$('opUpdateBtn').addEventListener('click', () => setOp('update'));
+function saveSections() { localStorage.setItem(STORAGE.SECTIONS, JSON.stringify(S.sections)); }
+
+function renderFormSections() {
+  const container = $('formSections');
+  container.innerHTML = '';
+  S.sections.forEach((sec, si) => {
+    const div = document.createElement('div');
+    div.className = 'form-section';
+    div.dataset.section = sec.id;
+
+    let fieldsHtml = '';
+    sec.fields.forEach(f => {
+      let inp = '';
+      if (f.type === 'select') {
+        const opts = (f.options || []).map(o => `<option value="${o}">${o || 'Select'}</option>`).join('');
+        inp = `<select id="f_${f.key}" name="${f.key}">${opts}</select>`;
+      } else if (f.type === 'textarea') {
+        inp = `<textarea id="f_${f.key}" name="${f.key}" rows="3" placeholder="${f.placeholder || ''}"></textarea>`;
+      } else if (f.type === 'date') {
+        inp = `<input type="date" id="f_${f.key}" name="${f.key}">`;
+      } else if (f.type === 'number') {
+        inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || '0'}" data-numeric>`;
+      } else {
+        inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || ''}">`;
+      }
+      fieldsHtml += `<div class="field"><label for="f_${f.key}">${f.label}</label>${inp}</div>`;
+    });
+
+    // wrap fields in rows of 2
+    const fieldEls = sec.fields;
+    let rowsHtml = '';
+    for (let i = 0; i < fieldEls.length; i += 2) {
+      const cls = fieldEls.length - i >= 3 && (i + 3 <= fieldEls.length) ? '' : '';
+      const f1 = fieldEls[i];
+      const f2 = fieldEls[i + 1];
+      let row = '<div class="form-row">';
+      row += buildFieldHtml(f1);
+      if (f2) row += buildFieldHtml(f2);
+      row += '</div>';
+      rowsHtml += row;
+    }
+
+    let calcHtml = '';
+    if (sec.hasLiveCalc) {
+      calcHtml = `<div class="live-calc" id="liveCalc">
+        <div class="live-calc__item"><span>Total Cost</span><strong id="lcCost">—</strong></div>
+        <div class="live-calc__item"><span>Revenue</span><strong id="lcRev">—</strong></div>
+        <div class="live-calc__item live-calc__item--green"><span>Net Spread</span><strong id="lcSpread">—</strong></div>
+        <div class="live-calc__item"><span>ROI</span><strong id="lcRoi">—</strong></div>
+      </div>`;
+    }
+
+    div.innerHTML = `
+      <div class="form-section__head">
+        <div class="form-section__title"><span class="form-section__num">${sec.num}</span>${sec.title}</div>
+      </div>
+      ${rowsHtml}
+      ${calcHtml}
+    `;
+    container.appendChild(div);
+  });
+
+  attachNumericFormatting();
+  attachLiveCalc();
+}
+
+function buildFieldHtml(f) {
+  if (!f) return '';
+  let inp = '';
+  if (f.type === 'select') {
+    const opts = (f.options || []).map(o => `<option value="${o}">${o || 'Select'}</option>`).join('');
+    inp = `<select id="f_${f.key}" name="${f.key}">${opts}</select>`;
+  } else if (f.type === 'textarea') {
+    inp = `<textarea id="f_${f.key}" name="${f.key}" rows="3" placeholder="${f.placeholder || ''}"></textarea>`;
+  } else if (f.type === 'date') {
+    inp = `<input type="date" id="f_${f.key}" name="${f.key}">`;
+  } else if (f.type === 'number') {
+    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || '0'}" data-numeric>`;
+  } else {
+    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || ''}">`;
+  }
+  return `<div class="field"><label for="f_${f.key}">${f.label}</label>${inp}</div>`;
+}
+
+function attachNumericFormatting() {
+  $$('input[data-numeric]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const c = inp.value.length - inp.selectionStart;
+      inp.value = fmtCommas(rawNum(inp.value));
+      inp.setSelectionRange(Math.max(0, inp.value.length - c), Math.max(0, inp.value.length - c));
+    });
+  });
+}
+
+function attachLiveCalc() {
+  const form = $('dealForm');
+  if (!form) return;
+  form.addEventListener('input', updateLiveCalc);
+  form.addEventListener('change', updateLiveCalc);
+}
+
+function updateLiveCalc() {
+  const lc = cleanNum($('f_land_cost')?.value);
+  const cc = cleanNum($('f_construction_cost')?.value);
+  const oc = cleanNum($('f_other_cost')?.value);
+  const rev = cleanNum($('f_expected_revenue')?.value);
+  const total = lc + cc + oc;
+  const spread = rev - total;
+  const roi = total > 0 ? ((spread / total) * 100).toFixed(1) : '—';
+
+  if ($('lcCost')) $('lcCost').textContent = total > 0 ? '$' + fmtCommas(String(total)) : '—';
+  if ($('lcRev')) $('lcRev').textContent = rev > 0 ? '$' + fmtCommas(String(rev)) : '—';
+  if ($('lcSpread')) $('lcSpread').textContent = total > 0 && rev > 0 ? `${spread >= 0 ? '+' : '−'}$${fmtCommas(String(Math.abs(spread)))}` : '—';
+  if ($('lcRoi')) $('lcRoi').textContent = roi !== '—' ? roi + '%' : '—';
+}
 
 /* ================================================================
-   LOAD DEALS (API + LOCAL STORAGE FALLBACK)
+   EDIT SECTIONS MODAL
    ================================================================ */
-async function loadDeals() {
-  let fetched = [];
-  const targetUrl = S.cfg.getDealsUrl || S.cfg.sheetUrl;
+$('editSectionsBtn').addEventListener('click', openEditSections);
+$('editSectionsCloseBtn').addEventListener('click', closeEditSections);
+$('editSectionsOverlay').addEventListener('click', e => { if (e.target === $('editSectionsOverlay')) closeEditSections(); });
 
-  if (targetUrl) {
-    try {
-      // Check if URL is a Google Sheet URL
-      if (targetUrl.includes('docs.google.com/spreadsheets')) {
-        fetched = await fetchGoogleSheetCsv(targetUrl);
-      } else {
-        const r = await fetch(targetUrl, { headers: { 'Accept': 'application/json' } });
-        if (r.ok) {
-          const d = await r.json();
-          fetched = normalizeDeals(d);
-        }
-      }
-    } catch (e) {
-      console.warn('Network fetch error, falling back to local deals:', e);
+function openEditSections() {
+  renderEditSections();
+  $('editSectionsOverlay').classList.add('is-open');
+}
+function closeEditSections() { $('editSectionsOverlay').classList.remove('is-open'); }
+
+function renderEditSections() {
+  const body = $('editSectionsBody');
+  body.innerHTML = '';
+  S.sections.forEach((sec, si) => {
+    let html = `<div class="edit-section-item"><span class="edit-section-item__name">${sec.num}. ${sec.title}</span></div>`;
+    sec.fields.forEach((f, fi) => {
+      html += `<div class="edit-field-item"><span class="edit-field-item__label">${f.label} <small style="color:var(--text-3);">(${f.type})</small></span><button class="edit-field-item__del" data-si="${si}" data-fi="${fi}" title="Remove field">✕</button></div>`;
+    });
+    html += `<div class="add-field-row">
+      <input type="text" placeholder="Field label…" id="newLabel_${si}">
+      <select id="newType_${si}"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="textarea">Textarea</option></select>
+      <button class="btn btn--sm btn--gold" data-si="${si}" id="addFieldBtn_${si}">+ Add</button>
+    </div>`;
+    body.insertAdjacentHTML('beforeend', html);
+  });
+
+  // Bind delete buttons
+  body.querySelectorAll('.edit-field-item__del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const si = Number(btn.dataset.si);
+      const fi = Number(btn.dataset.fi);
+      S.sections[si].fields.splice(fi, 1);
+      renderEditSections();
+    });
+  });
+
+  // Bind add buttons
+  S.sections.forEach((sec, si) => {
+    const addBtn = $(`addFieldBtn_${si}`);
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const label = $(`newLabel_${si}`).value.trim();
+        const type = $(`newType_${si}`).value;
+        if (!label) return;
+        const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        S.sections[si].fields.push({ key, label, type, placeholder: '' });
+        renderEditSections();
+      });
     }
-  }
-
-  const local = getLocalDeals();
-  const map = new Map();
-  local.forEach(d => d && d.deal_id && map.set(d.deal_id, d));
-  fetched.forEach(d => d && d.deal_id && map.set(d.deal_id, d));
-  S.deals = Array.from(map.values());
-
-  updateDealSelect();
-  updateStats();
-  if (S.view === 'deals') renderDeals();
+  });
 }
 
-/* Parse Google Sheet CSV Directly */
-async function fetchGoogleSheetCsv(url) {
-  let csvUrl = url;
-  // Convert standard Google Sheet URL to CSV export URL if needed
-  if (!url.includes('output=csv') && !url.includes('/export?format=csv')) {
-    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match && match[1]) {
-      csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv`;
-    }
-  }
+$('saveSectionsBtn').addEventListener('click', () => {
+  saveSections();
+  renderFormSections();
+  closeEditSections();
+  toast('Form sections updated!', 'ok');
+});
 
-  const res = await fetch(csvUrl);
-  if (!res.ok) return [];
-  const text = await res.text();
-  return parseCsvToDeals(text);
+$('resetSectionsBtn').addEventListener('click', () => {
+  S.sections = JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+  saveSections();
+  renderFormSections();
+  renderEditSections();
+  toast('Sections reset to default', 'ok');
+});
+
+/* ================================================================
+   GOOGLE SHEET CSV FETCH (ALL 4 TABS)
+   ================================================================ */
+async function fetchSheetCsv(gid) {
+  try {
+    const res = await fetch(CONFIG.csvUrl(gid));
+    if (!res.ok) return [];
+    const text = await res.text();
+    return parseCsv(text);
+  } catch (e) {
+    console.warn(`Sheet gid=${gid} fetch error:`, e);
+    return [];
+  }
 }
 
-function parseCsvToDeals(csvText) {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+function parseCsv(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
-
-  const headers = parseCsvRow(lines[0]).map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+  const headers = parseCsvRow(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
   const deals = [];
-
   for (let i = 1; i < lines.length; i++) {
     const row = parseCsvRow(lines[i]);
     if (row.length === 0) continue;
-    const deal = {};
+    const d = {};
     headers.forEach((h, idx) => {
-      let val = row[idx] ? row[idx].trim() : '';
-      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-      deal[h] = val;
+      if (!h) return;
+      let val = (row[idx] || '').replace(/^"|"$/g, '').trim();
+      d[h] = val;
     });
-    if (!deal.deal_id) deal.deal_id = 'DEAL-GS-' + (i);
-    deals.push(deal);
+    // Skip formula/instruction rows (rows without a proper Deal_ID)
+    if (!d.deal_id || d.deal_id.length > 20 || d.deal_id.includes('FORMULA') || d.deal_id.includes('VIEW') || d.deal_id.includes('AI ')) continue;
+    deals.push(d);
   }
   return deals;
 }
 
-function parseCsvRow(rowStr) {
+function parseCsvRow(str) {
   const result = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < rowStr.length; i++) {
-    const char = rowStr[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
+  let cur = '', inQ = false;
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
   }
-  result.push(current);
+  result.push(cur);
   return result;
 }
 
-function normalizeDeals(data) {
-  if (!data) return [];
-  if (Array.isArray(data)) return data.map(i => i && i.json ? i.json : i);
-  if (data.deals) return data.deals;
-  if (data.data) return data.data;
-  return [];
+/* ================================================================
+   LOAD DEALS — Fetch all 4 sheets, merge by Deal_ID
+   ================================================================ */
+async function loadDeals(showToast = false) {
+  const btn = $('refreshBtn');
+  if (btn) btn.classList.add('is-spinning');
+
+  // Fetch all 4 sheets in parallel
+  const [inputRows, execRows, assumRows, riskRows] = await Promise.all([
+    fetchSheetCsv(CONFIG.SHEETS.INPUT_DATA.gid),
+    fetchSheetCsv(CONFIG.SHEETS.EXECUTIVE_SUMMARY.gid),
+    fetchSheetCsv(CONFIG.SHEETS.DEAL_ASSUMPTIONS.gid),
+    fetchSheetCsv(CONFIG.SHEETS.RISK_RECOMMENDATION.gid),
+  ]);
+
+  // Build merged map by deal_id
+  const map = new Map();
+
+  // 1. Input Data (base)
+  inputRows.forEach(d => {
+    if (d.deal_id) map.set(d.deal_id, { ...d, _source: 'input' });
+  });
+
+  // 2. Executive Summary — merge (has PDF/PPT links!)
+  execRows.forEach(d => {
+    if (!d.deal_id) return;
+    const existing = map.get(d.deal_id) || {};
+    map.set(d.deal_id, { ...existing, ...d,
+      // Map column names to standard keys
+      pdf_link: d.ic_memo_pdf || d.pdf_link || existing.pdf_link || '',
+      ppt_link: d.investor_deck_ppt || d.ppt_link || existing.ppt_link || '',
+    });
+  });
+
+  // 3. Deal Assumptions — merge
+  assumRows.forEach(d => {
+    if (!d.deal_id) return;
+    const existing = map.get(d.deal_id) || {};
+    map.set(d.deal_id, { ...existing,
+      cost_per_sqft: d.cost_per_sqft || existing.cost_per_sqft || '',
+      revenue_per_sqft: d.revenue_per_sqft || existing.revenue_per_sqft || '',
+      deal_score: d.deal_score || existing.deal_score || '',
+      deal_category: d.deal_category || existing.deal_category || '',
+      rule_version: d.rule_version || existing.rule_version || '',
+      projected_profit: d.projected_profit || existing.projected_profit || '',
+      roi_percent: d.roi_percent || existing.roi_percent || '',
+      profit_margin_percent: d.profit_margin_percent || existing.profit_margin_percent || '',
+    });
+  });
+
+  // 4. Risk & Recommendation — merge
+  riskRows.forEach(d => {
+    if (!d.deal_id) return;
+    const existing = map.get(d.deal_id) || {};
+    map.set(d.deal_id, { ...existing,
+      ai_recommendation: d.ai_recommendation || existing.ai_recommendation || '',
+      final_decision: d.final_decision || existing.final_decision || '',
+      underwriting_summary: d.underwriting_summary || existing.underwriting_summary || '',
+      strengths: d.strengths || existing.strengths || '',
+      risks: d.risks || existing.risks || '',
+      missing_information: d.missing_information || existing.missing_information || '',
+      recommendation_reason: d.recommendation_reason || existing.recommendation_reason || '',
+    });
+  });
+
+  // Merge local storage deals
+  const local = getLocalDeals();
+  local.forEach(d => {
+    if (!d.deal_id) return;
+    if (!map.has(d.deal_id)) map.set(d.deal_id, d);
+  });
+
+  S.deals = Array.from(map.values());
+
+  updateStats();
+  if (S.view === 'deals') renderDeals();
+  if (S.view === 'reports') renderReports();
+
+  if (btn) btn.classList.remove('is-spinning');
+  if (showToast) toast(`Loaded ${S.deals.length} deals from ${Object.keys(CONFIG.SHEETS).length} sheets`, 'ok');
 }
 
 function getLocalDeals() {
   try { return JSON.parse(localStorage.getItem(STORAGE.DEALS) || '[]'); } catch { return []; }
 }
-
 function saveLocalDeal(d) {
   const list = getLocalDeals();
   const idx = list.findIndex(x => x.deal_id === d.deal_id);
@@ -253,213 +437,102 @@ function saveLocalDeal(d) {
   localStorage.setItem(STORAGE.DEALS, JSON.stringify(list));
 }
 
-function updateDealSelect() {
-  const sel = $('dealIdSelect');
-  sel.innerHTML = '';
-  if (S.deals.length === 0) {
-    sel.innerHTML = '<option value="">No deals found</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">Select a deal…</option>';
-  S.deals.forEach(d => {
-    const o = document.createElement('option');
-    o.value = d.deal_id;
-    o.textContent = `${d.deal_id} — ${d.project_name || 'Untitled'}`;
-    sel.appendChild(o);
-  });
-}
-
-$('dealIdSelect').addEventListener('change', () => {
-  const deal = S.deals.find(d => d.deal_id === $('dealIdSelect').value);
-  if (deal) {
-    FIELDS.forEach(f => {
-      const el = $(f.id);
-      if (!el || deal[f.k] === undefined) return;
-      el.value = f.numType === 'num' ? fmtCommas(String(deal[f.k])) : deal[f.k];
-    });
-    updateLiveSummary();
-    toast('Deal data loaded', 'ok');
-  }
-});
-
-$('refreshDealsBtn').addEventListener('click', loadDeals);
-
 /* ================================================================
-   LIVE SUMMARY (REAL-TIME FINANCIAL CALCULATIONS)
+   REFRESH BUTTON
    ================================================================ */
-function updateLiveSummary() {
-  const sym = SYM[$('currency').value] || '$';
-  const lc = Number(getNum($('landCost'))) || 0;
-  const cc = Number(getNum($('constructionCost'))) || 0;
-  const oc = Number(getNum($('otherCost'))) || 0;
-  const rev = Number(getNum($('expectedRevenue'))) || 0;
-  const total = lc + cc + oc;
-  const spread = rev - total;
-  const roi = total > 0 ? ((spread / total) * 100).toFixed(1) : '—';
-
-  $('lsTotalCost').textContent = total > 0 ? `${sym}${fmtCommas(String(total))}` : '—';
-  $('lsRevenue').textContent = rev > 0 ? `${sym}${fmtCommas(String(rev))}` : '—';
-  $('lsSpread').textContent = total > 0 && rev > 0 ? `${spread >= 0 ? '+' : '−'}${sym}${fmtCommas(String(Math.abs(spread)))}` : '—';
-  $('lsRoi').textContent = roi !== '—' ? `${roi}%` : '—';
-}
-
-$$('#dealForm input, #dealForm select, #dealForm textarea').forEach(el => {
-  el.addEventListener('input', updateLiveSummary);
-  el.addEventListener('change', updateLiveSummary);
-});
+$('refreshBtn').addEventListener('click', () => loadDeals(true));
+$('refreshDealsBtn').addEventListener('click', () => loadDeals(true));
 
 /* ================================================================
    STATS
    ================================================================ */
 function updateStats() {
   const n = S.deals.length;
-  let cap = 0, rev = 0, active = 0;
+  let cap = 0, rev = 0;
   S.deals.forEach(d => {
-    const c = Number(d.land_cost||0) + Number(d.construction_cost||0) + Number(d.other_cost||0);
-    cap += c;
-    rev += Number(d.expected_revenue||0);
-    if (d.priority === 'High' || d.priority === 'Critical') active++;
+    cap += cleanNum(d.land_cost) + cleanNum(d.construction_cost) + cleanNum(d.other_cost);
+    rev += cleanNum(d.expected_revenue);
   });
   $('statTotal').textContent = n;
   $('statCapital').textContent = fmtMoney(cap);
   $('statSpread').textContent = fmtMoney(rev - cap);
-  $('statActive').textContent = active;
 }
 
 /* ================================================================
-   QUICK FILL
+   QUICK FILL & CLEAR
    ================================================================ */
 $('quickFillBtn').addEventListener('click', () => {
   const sample = {
-    project_name:'Willow Creek Residences', developer_name:'Apex Developments', location:'Road 11, Banani',
-    district:'Dhaka', project_type:'Residential', priority:'High', land_area:'18500', floors:'18',
-    project_duration:'36', currency:'USD', land_cost:'25000000', construction_cost:'45000000',
-    other_cost:'5000000', expected_revenue:'98000000', expected_sales:'90000000',
-    expected_rental_income:'8000000', expected_exit_value:'105000000',
+    project_name: 'Willow Creek Residences', developer_name: 'Apex Developments',
+    location: 'Banani, Dhaka', property_type: 'Residential', land_area: '18500', floors: '18',
+    project_duration: '36', land_cost: '25000000', construction_cost: '45000000',
+    other_cost: '5000000', expected_revenue: '98000000', expected_sales: '90000000',
+    status: 'NEW',
     construction_start: new Date().toISOString().split('T')[0],
     construction_end: new Date(Date.now() + 1e10).toISOString().split('T')[0],
-    funding_type:'Joint Venture', land_ownership:'Freehold', developer_experience:'4-10 Projects',
-    legal_status:'Clear Title', site_condition:'Ready to Build', environmental_risk:'Low',
-    market_demand:'High', competition_level:'Medium',
-    notes:'All zoning permits secured. High residential demand corridor.',
+    funding_type: 'Joint Venture',
+    notes: 'All zoning permits secured. High residential demand corridor.',
   };
-  FIELDS.forEach(f => {
-    const el = $(f.id);
-    if (!el || !sample[f.k]) return;
-    el.value = f.numType === 'num' ? fmtCommas(sample[f.k]) : sample[f.k];
-    clearErr(f.id);
-  });
-  updateLiveSummary();
+  S.sections.forEach(sec => sec.fields.forEach(f => {
+    const el = $('f_' + f.key);
+    if (!el || !sample[f.key]) return;
+    el.value = f.type === 'number' ? fmtCommas(sample[f.key]) : sample[f.key];
+  }));
+  updateLiveCalc();
   toast('Sample data loaded', 'ok');
 });
 
 $('clearFormBtn').addEventListener('click', () => {
   $('dealForm').reset();
-  clearAllErr();
-  setOp('new');
-  updateLiveSummary();
+  updateLiveCalc();
   toast('Form cleared', 'ok');
 });
 
 /* ================================================================
-   VALIDATION
-   ================================================================ */
-function setErr(id, msg) {
-  const el = $(id); if (!el) return;
-  const f = el.closest('.field'); if (f) f.classList.add('is-invalid');
-  const e = $('err-' + id); if (e) e.textContent = msg;
-}
-function clearErr(id) {
-  const el = $(id); if (!el) return;
-  const f = el.closest('.field'); if (f) f.classList.remove('is-invalid');
-  const e = $('err-' + id); if (e) e.textContent = '';
-}
-function clearAllErr() {
-  $$('.field.is-invalid').forEach(f => f.classList.remove('is-invalid'));
-  $$('.field__err').forEach(e => e.textContent = '');
-}
-
-$$('#dealForm input, #dealForm select, #dealForm textarea').forEach(el => {
-  el.addEventListener('input', () => clearErr(el.id));
-  el.addEventListener('change', () => clearErr(el.id));
-});
-
-function validate() {
-  clearAllErr();
-  let first = null;
-  FIELDS.filter(f => f.req).forEach(f => {
-    const el = $(f.id); if (!el) return;
-    const v = el.value.trim();
-    let ok = !!v;
-    if (ok && f.numType === 'num') { const n = rawNum(el.value); ok = n !== '' && Number(n) >= 0; }
-    if (!ok) { setErr(f.id, f.numType === 'num' ? 'Enter a valid number' : 'Required'); if (!first) first = f.id; }
-  });
-  if (S.op === 'update' && !$('dealIdSelect').value) { setErr('dealIdSelect', 'Select a deal'); if (!first) first = 'dealIdSelect'; }
-  const s = $('constructionStart').value, e = $('constructionEnd').value;
-  if (s && e && new Date(e) < new Date(s)) { setErr('constructionEnd', 'Must be after start date'); if (!first) first = 'constructionEnd'; }
-  return first;
-}
-
-/* ================================================================
-   PAYLOAD & SUBMIT
+   BUILD PAYLOAD & SUBMIT
    ================================================================ */
 function buildPayload() {
-  const p = { operation: S.op, submitted_at: new Date().toISOString() };
-  p.deal_id = S.op === 'update' ? $('dealIdSelect').value : 'DEAL-' + Date.now().toString().slice(-6);
-  FIELDS.forEach(f => {
-    const el = $(f.id); if (!el) return;
-    p[f.k] = f.numType === 'num' ? getNum(el) : el.value.trim();
-  });
-
-  // Pre-calculate financial summary fields for Google Sheets / n8n
-  const lc = Number(p.land_cost || 0);
-  const cc = Number(p.construction_cost || 0);
-  const oc = Number(p.other_cost || 0);
-  const rev = Number(p.expected_revenue || 0);
+  const p = { deal_id: 'DEAL-' + Date.now().toString().slice(-6), submitted_at: new Date().toISOString() };
+  S.sections.forEach(sec => sec.fields.forEach(f => {
+    const el = $('f_' + f.key);
+    if (!el) return;
+    p[f.key] = f.type === 'number' ? rawNum(el.value) : el.value.trim();
+  }));
+  // Pre-calc
+  const lc = cleanNum(p.land_cost), cc = cleanNum(p.construction_cost), oc = cleanNum(p.other_cost);
+  const rev = cleanNum(p.expected_revenue);
   p.total_cost = lc + cc + oc;
   p.net_spread = rev - p.total_cost;
   p.roi_percent = p.total_cost > 0 ? Number(((p.net_spread / p.total_cost) * 100).toFixed(2)) : 0;
-
   return p;
 }
 
 $('dealForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   if (S.submitting) return;
-  const inv = validate();
-  if (inv) { $(inv).scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('Fix highlighted fields', 'err'); return; }
-
   const payload = buildPayload();
   S.submitting = true;
   $('submitBtn').disabled = true;
-  $('loadingOverlay').style.display = '';
+  $('loadingOverlay').classList.add('is-open');
 
   let ok = false;
   try {
-    const r = await fetch(S.cfg.submitUrl, {
+    const r = await fetch(CONFIG.SUBMIT_WEBHOOK, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (r.ok) ok = true;
-  } catch (e) {
-    console.warn('Submit fetch error:', e);
-  }
+  } catch (e) { console.warn('Submit error:', e); }
 
   saveLocalDeal(payload);
   S.submitting = false;
   $('submitBtn').disabled = false;
-  $('loadingOverlay').style.display = 'none';
-  localStorage.removeItem(STORAGE.DRAFT);
+  $('loadingOverlay').classList.remove('is-open');
 
-  toast(ok ? `Deal ${payload.deal_id} submitted to n8n!` : `Deal ${payload.deal_id} saved locally!`, 'ok');
+  toast(ok ? `Deal ${payload.deal_id} submitted!` : `Deal ${payload.deal_id} saved locally`, 'ok');
   $('dealForm').reset();
-  clearAllErr();
-  setOp('new');
-  updateLiveSummary();
+  updateLiveCalc();
   loadDeals();
   switchView('deals');
 });
@@ -474,51 +547,68 @@ function renderDeals() {
   const sort = $('filterSort').value;
 
   let list = [...S.deals];
-  if (q) list = list.filter(d => [d.project_name, d.developer_name, d.location, d.deal_id].some(v => (v||'').toLowerCase().includes(q)));
-  if (ft) list = list.filter(d => d.project_type === ft);
-  if (sort === 'cost-desc') list.sort((a,b) => (Number(b.land_cost||0)+Number(b.construction_cost||0)) - (Number(a.land_cost||0)+Number(a.construction_cost||0)));
-  else if (sort === 'cost-asc') list.sort((a,b) => (Number(a.land_cost||0)+Number(a.construction_cost||0)) - (Number(b.land_cost||0)+Number(b.construction_cost||0)));
-  else list.sort((a,b) => (b.submitted_at||'').localeCompare(a.submitted_at||''));
+  if (q) list = list.filter(d => [d.project_name, d.developer_name, d.location, d.deal_id].some(v => (v || '').toLowerCase().includes(q)));
+  if (ft) list = list.filter(d => (d.property_type || d.project_type || '') === ft);
+  if (sort === 'cost-desc') list.sort((a, b) => (cleanNum(b.total_cost || b.land_cost) + cleanNum(b.construction_cost)) - (cleanNum(a.total_cost || a.land_cost) + cleanNum(a.construction_cost)));
+  else if (sort === 'cost-asc') list.sort((a, b) => (cleanNum(a.total_cost || a.land_cost) + cleanNum(a.construction_cost)) - (cleanNum(b.total_cost || b.land_cost) + cleanNum(b.construction_cost)));
+  else list.sort((a, b) => (b.submitted_at || b.created_at || '').localeCompare(a.submitted_at || a.created_at || ''));
 
   grid.innerHTML = '';
-  if (list.length === 0) { grid.innerHTML = '<div class="empty-state"><p>No deals found. Submit a deal to get started.</p></div>'; return; }
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><p>No deals found. Submit your first deal or click Refresh to load from Google Sheet.</p></div>';
+    return;
+  }
 
   list.forEach(d => {
-    const sym = SYM[d.currency] || '$';
-    const cost = Number(d.land_cost||0) + Number(d.construction_cost||0) + Number(d.other_cost||0);
-    const rev = Number(d.expected_revenue||0);
-    const pClass = d.priority === 'High' || d.priority === 'Critical' ? 'high' : d.priority === 'Low' ? 'low' : 'medium';
+    const cost = cleanNum(d.total_cost) || (cleanNum(d.land_cost) + cleanNum(d.construction_cost) + cleanNum(d.other_cost));
+    const rev = cleanNum(d.expected_revenue);
+    const score = d.deal_score || '';
+    const category = (d.deal_category || '').toUpperCase();
+    const decision = (d.final_decision || d.status || '').toUpperCase();
+
+    // Status badge color
+    let statusClass = '';
+    if (decision === 'PROCEED' || decision === 'NEW') statusClass = 'deal-card__status--new';
+
+    // Score badge
+    let scoreBadge = '';
+    if (score) {
+      const scoreColor = Number(score) >= 70 ? 'var(--green)' : Number(score) >= 40 ? 'var(--gold)' : 'var(--red)';
+      scoreBadge = `<div class="deal-card__score" style="color:${scoreColor}"><strong>${score}</strong>/100</div>`;
+    }
+
+    // Download buttons
+    let downloads = '';
+    if (d.pdf_link || d.ppt_link) {
+      downloads = '<div class="deal-card__downloads">';
+      if (d.pdf_link) downloads += `<a class="dl-btn" href="${d.pdf_link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 PDF</a>`;
+      if (d.ppt_link) downloads += `<a class="dl-btn" href="${d.ppt_link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📊 PPT</a>`;
+      downloads += '</div>';
+    }
 
     const card = document.createElement('div');
     card.className = 'deal-card';
     card.innerHTML = `
       <div class="deal-card__top">
-        <span class="deal-card__id">${d.deal_id||'—'}</span>
-        <span class="deal-card__badge deal-card__badge--${pClass}">${d.priority||'Normal'}</span>
+        <span class="deal-card__id">${d.deal_id || '—'}</span>
+        <span class="deal-card__status ${statusClass}">${decision || 'Active'}${category ? ' · ' + category : ''}</span>
       </div>
-      <div class="deal-card__name">${d.project_name||'Untitled'}</div>
-      <div class="deal-card__meta">${[d.developer_name, d.location].filter(Boolean).join(' · ')}</div>
+      <div class="deal-card__name">${d.project_name || 'Untitled'}</div>
+      <div class="deal-card__meta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        ${d.location || '—'} · ${d.property_type || '—'}
+      </div>
       <dl class="deal-card__nums">
-        <div><dt>Cost</dt><dd>${sym}${fmtCommas(String(cost))}</dd></div>
-        <div><dt>Revenue</dt><dd>${sym}${fmtCommas(String(rev))}</dd></div>
+        <div><dt>Total Cost</dt><dd>$${fmtCommas(String(cost))}</dd></div>
+        <div><dt>Revenue</dt><dd>$${fmtCommas(String(rev))}</dd></div>
       </dl>
-      ${buildDownloadLinks(d)}
-      <div class="deal-card__footer">View Full Details →</div>
+      ${scoreBadge}
+      ${downloads}
+      <div class="deal-card__arrow">View Details →</div>
     `;
     card.addEventListener('click', () => openModal(d.deal_id));
     grid.appendChild(card);
   });
-}
-
-/* Build PDF/PPT download links from Google Sheet data */
-function buildDownloadLinks(deal) {
-  const links = [];
-  if (deal.pdf_link) links.push(`<a class="dl-link" href="${deal.pdf_link}" target="_blank" rel="noopener">📄 PDF Report</a>`);
-  if (deal.ppt_link) links.push(`<a class="dl-link" href="${deal.ppt_link}" target="_blank" rel="noopener">📊 PPT Deck</a>`);
-  if (deal.ic_memo_link) links.push(`<a class="dl-link" href="${deal.ic_memo_link}" target="_blank" rel="noopener">📋 IC Memo</a>`);
-  if (deal.financial_model_link) links.push(`<a class="dl-link" href="${deal.financial_model_link}" target="_blank" rel="noopener">📈 Financial Model</a>`);
-  if (links.length === 0) return '';
-  return `<div class="deal-card__downloads">${links.join('')}</div>`;
 }
 
 $('searchInput').addEventListener('input', renderDeals);
@@ -526,82 +616,131 @@ $('filterType').addEventListener('change', renderDeals);
 $('filterSort').addEventListener('change', renderDeals);
 
 /* ================================================================
-   DEAL DETAIL MODAL
+   DEAL DETAIL MODAL — Shows data from all 4 sheets
    ================================================================ */
 function openModal(id) {
   const d = S.deals.find(x => x.deal_id === id);
   if (!d) return;
   S.currentDeal = d;
-  const sym = SYM[d.currency] || '$';
-  const cost = Number(d.land_cost||0) + Number(d.construction_cost||0) + Number(d.other_cost||0);
-  const rev = Number(d.expected_revenue||0);
-  const spread = rev - cost;
-  const roi = cost > 0 ? ((spread/cost)*100).toFixed(1) : '0';
+
+  const cost = cleanNum(d.total_cost) || (cleanNum(d.land_cost) + cleanNum(d.construction_cost) + cleanNum(d.other_cost));
+  const rev = cleanNum(d.expected_revenue);
+  const profit = cleanNum(d.projected_profit) || (rev - cost);
+  const roi = d.roi_percent || (cost > 0 ? ((profit / cost) * 100).toFixed(1) : '0');
+  const margin = d.profit_margin_percent || (rev > 0 ? ((profit / rev) * 100).toFixed(1) : '0');
 
   $('modalBadge').textContent = d.deal_id;
   $('modalTitle').textContent = d.project_name || 'Untitled';
-  $('modalSub').textContent = [d.developer_name, d.location, d.district].filter(Boolean).join(' · ');
+  $('modalSub').textContent = [d.location, d.property_type].filter(Boolean).join(' · ');
 
-  let html = `
-    <div class="exec-grid" style="margin-bottom:24px;">
-      <div class="exec-box"><span class="exec-box__val">${sym}${fmtCommas(String(cost))}</span><span class="exec-box__label">Total Cost</span></div>
-      <div class="exec-box"><span class="exec-box__val">${sym}${fmtCommas(String(rev))}</span><span class="exec-box__label">Revenue</span></div>
-      <div class="exec-box"><span class="exec-box__val" style="color:var(--green)">${sym}${fmtCommas(String(spread))}</span><span class="exec-box__label">Net Spread</span></div>
-      <div class="exec-box"><span class="exec-box__val">${roi}%</span><span class="exec-box__label">ROI</span></div>
-    </div>
-    <dl class="detail-grid">
-      <div class="detail-item"><dt>Asset Type</dt><dd>${d.project_type||'—'}</dd></div>
-      <div class="detail-item"><dt>Priority</dt><dd>${d.priority||'—'}</dd></div>
-      <div class="detail-item"><dt>Land Area</dt><dd>${d.land_area ? fmtCommas(d.land_area)+' sqft' : '—'}</dd></div>
-      <div class="detail-item"><dt>Floors</dt><dd>${d.floors||'—'}</dd></div>
-      <div class="detail-item"><dt>Duration</dt><dd>${d.project_duration||'—'} months</dd></div>
-      <div class="detail-item"><dt>Land Cost</dt><dd>${sym}${fmtCommas(String(d.land_cost||0))}</dd></div>
-      <div class="detail-item"><dt>Construction</dt><dd>${sym}${fmtCommas(String(d.construction_cost||0))}</dd></div>
-      <div class="detail-item"><dt>Other Costs</dt><dd>${sym}${fmtCommas(String(d.other_cost||0))}</dd></div>
-      <div class="detail-item"><dt>Exit Value</dt><dd>${sym}${fmtCommas(String(d.expected_exit_value||0))}</dd></div>
-      <div class="detail-item"><dt>Sales</dt><dd>${sym}${fmtCommas(String(d.expected_sales||0))}</dd></div>
-      <div class="detail-item"><dt>Rental Income</dt><dd>${sym}${fmtCommas(String(d.expected_rental_income||0))}</dd></div>
-      <div class="detail-item"><dt>Start Date</dt><dd>${d.construction_start||'—'}</dd></div>
-      <div class="detail-item"><dt>End Date</dt><dd>${d.construction_end||'—'}</dd></div>
-      <div class="detail-item"><dt>Funding</dt><dd>${d.funding_type||'—'}</dd></div>
-      <div class="detail-item"><dt>Land Ownership</dt><dd>${d.land_ownership||'—'}</dd></div>
-      <div class="detail-item"><dt>Dev. Experience</dt><dd>${d.developer_experience||'—'}</dd></div>
-      <div class="detail-item"><dt>Legal Status</dt><dd>${d.legal_status||'—'}</dd></div>
-      <div class="detail-item"><dt>Site Condition</dt><dd>${d.site_condition||'—'}</dd></div>
-      <div class="detail-item"><dt>Env. Risk</dt><dd>${d.environmental_risk||'—'}</dd></div>
-      <div class="detail-item"><dt>Market Demand</dt><dd>${d.market_demand||'—'}</dd></div>
-      <div class="detail-item"><dt>Competition</dt><dd>${d.competition_level||'—'}</dd></div>
-      <div class="detail-item"><dt>Currency</dt><dd>${d.currency||'—'}</dd></div>
-    </dl>`;
+  let html = '';
 
-  if (d.notes) html += `<div style="margin-top:16px;padding:14px;background:var(--surface-2);border-radius:var(--radius-sm);font-size:13px;color:var(--text-2);white-space:pre-wrap;">${d.notes}</div>`;
+  // ── Decision Banner ──
+  if (d.final_decision || d.deal_score) {
+    const dec = (d.final_decision || '').toUpperCase();
+    const cat = (d.deal_category || '').toUpperCase();
+    const decColor = dec === 'PROCEED' ? 'var(--green)' : dec === 'REJECT' ? 'var(--red)' : 'var(--gold)';
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:20px;">
+      <div><span style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">AI Decision</span>
+      <div style="font-size:20px;font-weight:800;color:${decColor};">${dec || '—'} ${cat ? '· <span style="font-size:14px;color:var(--text-2);">' + cat + '</span>' : ''}</div></div>
+      <div style="text-align:center;"><span style="font-size:28px;font-weight:800;">${d.deal_score || '—'}</span><div style="font-size:10px;color:var(--text-3);">SCORE</div></div>
+    </div>`;
+  }
 
-  // Download links from Google Sheet columns
+  // ── Financial Summary Row ──
+  html += `<div class="exec-row" style="margin-bottom:24px;">
+    <div class="exec-box"><span class="exec-box__val">$${fmtCommas(String(cost))}</span><span class="exec-box__lab">Total Cost</span></div>
+    <div class="exec-box"><span class="exec-box__val">$${fmtCommas(String(rev))}</span><span class="exec-box__lab">Revenue</span></div>
+    <div class="exec-box"><span class="exec-box__val" style="color:var(--green)">$${fmtCommas(String(profit))}</span><span class="exec-box__lab">Profit</span></div>
+    <div class="exec-box"><span class="exec-box__val">${roi}%</span><span class="exec-box__lab">ROI</span></div>
+  </div>`;
+
+  // ── Project Details Grid ──
+  html += '<dl class="detail-grid">';
+  const projectKeys = [
+    ['project_name','Project Name'], ['location','Location'], ['property_type','Property Type'],
+    ['land_area','Land Area'], ['project_duration','Duration (months)'], ['status','Status'],
+    ['land_cost','Land Cost'], ['construction_cost','Construction Cost'], ['other_cost','Other Costs'],
+    ['cost_per_sqft','Cost/sqft'], ['revenue_per_sqft','Revenue/sqft'], ['profit_margin_percent','Profit Margin %'],
+    ['funding_type','Funding'], ['rule_version','Rule Version'], ['created_at','Created'],
+  ];
+  projectKeys.forEach(([k, label]) => {
+    if (d[k]) html += `<div class="detail-item"><dt>${label}</dt><dd>${d[k]}</dd></div>`;
+  });
+  html += '</dl>';
+
+  // ── Underwriting Summary ──
+  if (d.underwriting_summary) {
+    html += `<div style="margin-top:20px;padding:16px;background:var(--surface-2);border-radius:var(--radius-sm);border-left:3px solid var(--gold);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Underwriting Summary</h4>
+      <p style="font-size:13px;line-height:1.7;color:var(--text-2);">${d.underwriting_summary}</p>
+    </div>`;
+  }
+
+  // ── Strengths ──
+  if (d.strengths) {
+    html += `<div style="margin-top:14px;padding:14px 16px;background:var(--green-bg);border-radius:var(--radius-sm);border-left:3px solid var(--green);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:8px;">✓ Strengths</h4>
+      <div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;">${d.strengths}</div>
+    </div>`;
+  }
+
+  // ── Risks ──
+  if (d.risks) {
+    html += `<div style="margin-top:14px;padding:14px 16px;background:var(--red-bg);border-radius:var(--radius-sm);border-left:3px solid var(--red);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--red);margin-bottom:8px;">⚠ Risks</h4>
+      <div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;">${d.risks}</div>
+    </div>`;
+  }
+
+  // ── Missing Information ──
+  if (d.missing_information) {
+    html += `<div style="margin-top:14px;padding:14px 16px;background:var(--blue-bg);border-radius:var(--radius-sm);border-left:3px solid var(--blue);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--blue);margin-bottom:8px;">ℹ Missing Information</h4>
+      <div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;">${d.missing_information}</div>
+    </div>`;
+  }
+
+  // ── Recommendation Reason ──
+  if (d.recommendation_reason) {
+    html += `<div style="margin-top:14px;padding:14px 16px;background:var(--surface-2);border-radius:var(--radius-sm);border-left:3px solid var(--navy);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Recommendation Reason</h4>
+      <p style="font-size:13px;line-height:1.7;color:var(--text-2);">${d.recommendation_reason}</p>
+    </div>`;
+  }
+
+  // ── Notes ──
+  if (d.notes) {
+    html += `<div style="margin-top:14px;padding:14px 16px;background:var(--surface-2);border-radius:var(--radius-sm);">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:6px;">Notes</h4>
+      <p style="font-size:13px;color:var(--text-2);white-space:pre-wrap;">${d.notes}</p>
+    </div>`;
+  }
+
+  // ── Download Links ──
   const dlLinks = [];
-  if (d.pdf_link) dlLinks.push(`<a class="dl-link" href="${d.pdf_link}" target="_blank">📄 Download PDF Report</a>`);
-  if (d.ppt_link) dlLinks.push(`<a class="dl-link" href="${d.ppt_link}" target="_blank">📊 Download PPT Deck</a>`);
-  if (d.ic_memo_link) dlLinks.push(`<a class="dl-link" href="${d.ic_memo_link}" target="_blank">📋 IC Memo</a>`);
-  if (d.financial_model_link) dlLinks.push(`<a class="dl-link" href="${d.financial_model_link}" target="_blank">📈 Financial Model</a>`);
+  if (d.pdf_link) dlLinks.push(`<a class="dl-btn" href="${d.pdf_link}" target="_blank">📄 Download IC Memo PDF</a>`);
+  if (d.ppt_link) dlLinks.push(`<a class="dl-btn" href="${d.ppt_link}" target="_blank">📊 Download Investor Deck PPT</a>`);
   if (dlLinks.length > 0) {
     html += `<div class="modal-downloads"><h4>Documents & Downloads</h4><div class="modal-downloads__list">${dlLinks.join('')}</div></div>`;
   }
 
   $('modalBody').innerHTML = html;
-  $('modalOverlay').style.display = '';
+  $('modalOverlay').classList.add('is-open');
 }
 
-function closeModal() { $('modalOverlay').style.display = 'none'; S.currentDeal = null; }
+function closeModal() { $('modalOverlay').classList.remove('is-open'); S.currentDeal = null; }
 $('modalCloseBtn').addEventListener('click', closeModal);
 $('modalCloseFootBtn').addEventListener('click', closeModal);
 $('modalOverlay').addEventListener('click', e => { if (e.target === $('modalOverlay')) closeModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('modalOverlay').style.display !== 'none') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeEditSections(); } });
 
 $('modalPrintBtn').addEventListener('click', () => window.print());
 $('modalExportBtn').addEventListener('click', () => {
   if (!S.currentDeal) return;
   const blob = new Blob([JSON.stringify(S.currentDeal, null, 2)], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `${S.currentDeal.deal_id}_underwriting.json`; a.click(); URL.revokeObjectURL(a.href);
+  a.download = `${S.currentDeal.deal_id}_underwriting.json`; a.click();
 });
 
 /* ================================================================
@@ -609,17 +748,18 @@ $('modalExportBtn').addEventListener('click', () => {
    ================================================================ */
 function renderReports() {
   const deals = S.deals;
-  const typeCounts = {}, fundCounts = {}, riskCounts = {};
+  const typeCounts = {}, statusCounts = {};
   let totalCap = 0, totalRev = 0, roiSum = 0;
 
   deals.forEach(d => {
-    const c = Number(d.land_cost||0)+Number(d.construction_cost||0)+Number(d.other_cost||0);
-    const r = Number(d.expected_revenue||0);
+    const c = cleanNum(d.land_cost) + cleanNum(d.construction_cost) + cleanNum(d.other_cost);
+    const r = cleanNum(d.expected_revenue);
     totalCap += c; totalRev += r;
-    roiSum += c > 0 ? ((r-c)/c)*100 : 0;
-    typeCounts[d.project_type||'Other'] = (typeCounts[d.project_type||'Other']||0) + c;
-    fundCounts[d.funding_type||'Other'] = (fundCounts[d.funding_type||'Other']||0) + 1;
-    riskCounts[d.legal_status||'Other'] = (riskCounts[d.legal_status||'Other']||0) + 1;
+    roiSum += c > 0 ? ((r - c) / c) * 100 : 0;
+    const type = d.property_type || d.project_type || 'Other';
+    typeCounts[type] = (typeCounts[type] || 0) + c;
+    const status = d.status || 'Unknown';
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
 
   $('execCap').textContent = fmtMoney(totalCap);
@@ -627,21 +767,22 @@ function renderReports() {
   $('execSpread').textContent = fmtMoney(totalRev - totalCap);
   $('execRoi').textContent = deals.length > 0 ? (roiSum / deals.length).toFixed(1) + '%' : '0%';
 
-  renderBars($('chartAsset'), typeCounts, totalCap, true);
-  renderBars($('chartFunding'), fundCounts, deals.length, false);
-  renderBars($('chartRisk'), riskCounts, deals.length, false);
+  renderBars($('chartAsset'), typeCounts, totalCap, true, 'gold');
+  renderBars($('chartStatus'), statusCounts, deals.length, false, 'navy');
 }
 
-function renderBars(container, obj, total, isMoney) {
+function renderBars(container, obj, total, isMoney, color) {
   container.innerHTML = '';
-  if (Object.keys(obj).length === 0) { container.innerHTML = '<p style="color:var(--text-2);font-size:12px;">No data yet</p>'; return; }
+  if (Object.keys(obj).length === 0) { container.innerHTML = '<p style="color:var(--text-3);font-size:12px;">No data yet</p>'; return; }
   Object.entries(obj).forEach(([label, val]) => {
     const pct = total > 0 ? Math.round((val / total) * 100) : 0;
     const display = isMoney ? fmtMoney(val) + ` (${pct}%)` : `${val} deals (${pct}%)`;
-    const item = document.createElement('div');
-    item.className = 'bar-item';
-    item.innerHTML = `<div class="bar-item__head"><span>${label}</span><span style="font-weight:700;">${display}</span></div><div class="bar-item__track"><div class="bar-item__fill" style="width:${Math.max(pct,4)}%;"></div></div>`;
-    container.appendChild(item);
+    container.insertAdjacentHTML('beforeend', `
+      <div class="bar-item">
+        <div class="bar-item__head"><span>${label}</span><span style="font-weight:700;">${display}</span></div>
+        <div class="bar-item__track"><div class="bar-item__fill bar-item__fill--${color}" style="width:${Math.max(pct, 4)}%;"></div></div>
+      </div>
+    `);
   });
 }
 
@@ -649,71 +790,15 @@ $('exportCsvBtn').addEventListener('click', () => {
   if (S.deals.length === 0) { toast('No deals to export', 'err'); return; }
   const keys = Object.keys(S.deals[0]);
   let csv = keys.join(',') + '\n';
-  S.deals.forEach(d => { csv += keys.map(k => `"${String(d[k]||'').replace(/"/g,'""')}"`).join(',') + '\n'; });
+  S.deals.forEach(d => { csv += keys.map(k => `"${String(d[k] || '').replace(/"/g, '""')}"`).join(',') + '\n'; });
   const b = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
-  a.download = `underwriting_pipeline_${new Date().toISOString().split('T')[0]}.csv`; a.click();
-});
-
-/* ================================================================
-   SETTINGS
-   ================================================================ */
-function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem(STORAGE.SETTINGS)); if (s) S.cfg = { ...DEFAULTS, ...s }; } catch {}
-  $('cfgSubmitUrl').value = S.cfg.submitUrl;
-  $('cfgGetDealsUrl').value = S.cfg.getDealsUrl;
-  $('cfgSheetUrl').value = S.cfg.sheetUrl || '';
-}
-
-$('saveSettingsBtn').addEventListener('click', () => {
-  S.cfg.submitUrl = $('cfgSubmitUrl').value.trim() || DEFAULTS.submitUrl;
-  S.cfg.getDealsUrl = $('cfgGetDealsUrl').value.trim() || DEFAULTS.getDealsUrl;
-  S.cfg.sheetUrl = $('cfgSheetUrl').value.trim();
-  localStorage.setItem(STORAGE.SETTINGS, JSON.stringify(S.cfg));
-  toast('Settings saved', 'ok');
-  loadDeals();
-});
-
-$('resetSettingsBtn').addEventListener('click', () => {
-  S.cfg = { ...DEFAULTS };
-  localStorage.removeItem(STORAGE.SETTINGS);
-  loadSettings();
-  toast('Settings reset to defaults', 'ok');
-});
-
-$('testConnBtn').addEventListener('click', async () => {
-  const el = $('testResult');
-  el.style.display = '';
-  el.className = 'test-result';
-  el.textContent = 'Testing connection…';
-  const targetUrl = S.cfg.getDealsUrl || S.cfg.sheetUrl;
-
-  if (!targetUrl) {
-    el.className = 'test-result test-result--err';
-    el.textContent = '⚠ Please enter a Get Deals URL or Google Sheet URL first.';
-    return;
-  }
-
-  try {
-    if (targetUrl.includes('docs.google.com/spreadsheets')) {
-      const deals = await fetchGoogleSheetCsv(targetUrl);
-      el.className = 'test-result test-result--ok';
-      el.textContent = `✓ Google Sheet Connected — Successfully fetched ${deals.length} deals from sheet!`;
-    } else {
-      const r = await fetch(targetUrl, { method: 'GET' });
-      el.className = r.ok ? 'test-result test-result--ok' : 'test-result test-result--err';
-      el.textContent = r.ok ? `✓ Connected to n8n Webhook — HTTP ${r.status}` : `⚠ Webhook returned HTTP ${r.status}`;
-    }
-  } catch (e) {
-    el.className = 'test-result test-result--err';
-    el.textContent = `✖ Connection failed: ${e.message}. (Note: n8n test webhooks expire or require active CORS). Local storage fallback is active.`;
-  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'underwriting_pipeline.csv'; a.click();
 });
 
 /* ================================================================
    TOAST
    ================================================================ */
-function toast(msg, type) {
+function toast(msg, type = 'ok') {
   const t = document.createElement('div');
   t.className = `toast toast--${type}`;
   t.textContent = msg;
@@ -726,10 +811,9 @@ function toast(msg, type) {
    ================================================================ */
 function init() {
   setTheme(localStorage.getItem(STORAGE.THEME) || 'light');
-  loadSettings();
-  attachNumericFormatting();
-  setOp('new');
-  updateLiveSummary();
+  loadSections();
+  renderFormSections();
+  updateLiveCalc();
   loadDeals();
   $('liveDate').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 }

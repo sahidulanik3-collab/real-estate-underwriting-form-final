@@ -4,272 +4,189 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Meridian Capital — Real Estate Underwriting Platform</title>
-<meta name="description" content="Enterprise real estate underwriting, deal intake, and portfolio management platform.">
+<meta name="description" content="Premium real estate underwriting, deal pipeline management, and investment analytics platform.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ========== TOP NAV ========== -->
-<header class="topbar" id="topbar">
+<!-- ========== TOPBAR ========== -->
+<header class="topbar">
   <div class="topbar__inner">
     <a class="logo" href="#">
-      <span class="logo__icon">M</span>
-      <span class="logo__text">Meridian Capital</span>
+      <span class="logo__icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+      </span>
+      <div class="logo__text">
+        <span class="logo__name">Meridian Capital</span>
+        <span class="logo__tag">Real Estate Underwriting</span>
+      </div>
     </a>
     <nav class="nav" id="mainNav">
-      <button class="nav__btn is-active" data-view="dashboard">Dashboard</button>
-      <button class="nav__btn" data-view="deals">Deals</button>
-      <button class="nav__btn" data-view="reports">Reports</button>
-      <button class="nav__btn" data-view="settings">Settings</button>
+      <button class="nav__btn is-active" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg> Dashboard</button>
+      <button class="nav__btn" data-view="deals"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Deals Pipeline</button>
+      <button class="nav__btn" data-view="reports"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Analytics</button>
     </nav>
-    <div class="topbar__right">
-      <span class="topbar__date" id="liveDate"></span>
-      <button class="icon-btn" id="themeBtn" title="Toggle theme">
-        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <div class="topbar__actions">
+      <button class="btn btn--refresh" id="refreshBtn" title="Refresh data from Google Sheet">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        <span>Refresh</span>
       </button>
-      <div class="avatar">IC</div>
+      <span class="topbar__date" id="liveDate"></span>
+      <button class="icon-btn" id="themeBtn" title="Toggle dark mode">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
     </div>
   </div>
 </header>
 
 <!-- ==================== VIEW: DASHBOARD ==================== -->
 <section class="view is-active" id="view-dashboard">
-
-  <!-- Stats Row -->
-  <div class="container">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Deal Intake Dashboard</h1>
-        <p class="page-subtitle">Submit new deals or update existing records for underwriting evaluation.</p>
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero__inner">
+      <div class="hero__content">
+        <span class="hero__eyebrow">Enterprise Deal Management</span>
+        <h1 class="hero__title">Underwriting<br>Deal Submission</h1>
+        <p class="hero__desc">Submit, evaluate, and manage institutional real estate investment opportunities with automated pipeline sync.</p>
       </div>
-      <div class="page-header__actions">
-        <button class="btn btn--outline" id="quickFillBtn">⚡ Quick Fill Sample</button>
-        <button class="btn btn--outline" id="clearFormBtn">Clear</button>
+      <div class="hero__stats" id="heroStats">
+        <div class="hero-stat"><div class="hero-stat__num" id="statTotal">0</div><div class="hero-stat__label">Total Deals</div></div>
+        <div class="hero-stat hero-stat--gold"><div class="hero-stat__num" id="statCapital">$0</div><div class="hero-stat__label">Total Capital</div></div>
+        <div class="hero-stat hero-stat--green"><div class="hero-stat__num" id="statSpread">$0</div><div class="hero-stat__label">Net Spread</div></div>
       </div>
-    </div>
-
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-card__num" id="statTotal">0</div><div class="stat-card__label">Total Deals</div></div>
-      <div class="stat-card stat-card--gold"><div class="stat-card__num" id="statCapital">$0</div><div class="stat-card__label">Total Capital</div></div>
-      <div class="stat-card stat-card--green"><div class="stat-card__num" id="statSpread">$0</div><div class="stat-card__label">Net Spread</div></div>
-      <div class="stat-card stat-card--purple"><div class="stat-card__num" id="statActive">0</div><div class="stat-card__label">Active Pipeline</div></div>
-    </div>
-  </div>
-
-  <!-- Operation Toggle -->
-  <div class="container">
-    <div class="op-toggle">
-      <button class="op-toggle__btn is-active" id="opNewBtn" data-op="new">● New Deal</button>
-      <button class="op-toggle__btn" id="opUpdateBtn" data-op="update">● Update Existing</button>
     </div>
   </div>
 
   <!-- Deal Form -->
   <div class="container">
-    <form class="deal-form" id="dealForm" novalidate>
-
-      <!-- Deal ID (update only) -->
-      <div class="form-card" id="dealIdSection" style="display:none;">
-        <h2 class="form-card__title">Select Deal to Update</h2>
-        <div class="form-row">
-          <div class="field">
-            <label for="dealIdSelect">Deal ID <span class="req">*</span></label>
-            <select id="dealIdSelect"><option value="">Loading…</option></select>
-            <span class="field__err" id="err-dealIdSelect"></span>
-          </div>
-        </div>
+    <div class="form-header">
+      <h2 class="form-header__title">New Deal Submission</h2>
+      <div class="form-header__actions">
+        <button class="btn btn--ghost" id="quickFillBtn">⚡ Sample Data</button>
+        <button class="btn btn--ghost" id="clearFormBtn">✕ Clear</button>
+        <button class="btn btn--ghost" id="editSectionsBtn">✎ Edit Sections</button>
       </div>
+    </div>
 
-      <!-- Section 1: Project Info -->
-      <div class="form-card">
-        <h2 class="form-card__title"><span class="form-card__num">01</span> Project Information</h2>
-        <div class="form-row">
-          <div class="field"><label for="projectName">Project Name <span class="req">*</span></label><input type="text" id="projectName" name="project_name" required placeholder="e.g. Grand Horizon Tower"><span class="field__err" id="err-projectName"></span></div>
-          <div class="field"><label for="developerName">Developer Name <span class="req">*</span></label><input type="text" id="developerName" name="developer_name" required placeholder="e.g. Apex Developments"><span class="field__err" id="err-developerName"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="location">Location <span class="req">*</span></label><input type="text" id="location" name="location" required placeholder="e.g. Banani, Dhaka"><span class="field__err" id="err-location"></span></div>
-          <div class="field"><label for="district">District <span class="req">*</span></label><input type="text" id="district" name="district" required placeholder="e.g. Dhaka"><span class="field__err" id="err-district"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="projectType">Project Type <span class="req">*</span></label><select id="projectType" name="project_type" required><option value="">Select</option><option>Residential</option><option>Commercial</option><option>Mixed-Use</option><option>Industrial</option><option>Hospitality</option><option>Land Development</option></select><span class="field__err" id="err-projectType"></span></div>
-          <div class="field"><label for="priority">Priority <span class="req">*</span></label><select id="priority" name="priority" required><option value="">Select</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select><span class="field__err" id="err-priority"></span></div>
-        </div>
-        <div class="form-row form-row--3">
-          <div class="field"><label for="landArea">Land Area (sqft) <span class="req">*</span></label><input type="text" id="landArea" name="land_area" required placeholder="e.g. 12,500" data-numeric><span class="field__err" id="err-landArea"></span></div>
-          <div class="field"><label for="floors">Floors <span class="req">*</span></label><input type="text" id="floors" name="floors" required placeholder="e.g. 14" data-numeric><span class="field__err" id="err-floors"></span></div>
-          <div class="field"><label for="projectDuration">Duration (months) <span class="req">*</span></label><input type="text" id="projectDuration" name="project_duration" required placeholder="e.g. 30" data-numeric><span class="field__err" id="err-projectDuration"></span></div>
-        </div>
+    <form id="dealForm" novalidate>
+      <div id="formSections">
+        <!-- Sections rendered by JS -->
       </div>
-
-      <!-- Section 2: Financials -->
-      <div class="form-card">
-        <h2 class="form-card__title"><span class="form-card__num">02</span> Financial Information</h2>
-        <div class="form-row">
-          <div class="field"><label for="currency">Currency <span class="req">*</span></label><select id="currency" name="currency" required><option value="">Select</option><option value="BDT">BDT (৳)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option><option value="GBP">GBP (£)</option></select><span class="field__err" id="err-currency"></span></div>
-          <div class="field"><label for="landCost">Land Cost <span class="req">*</span></label><input type="text" id="landCost" name="land_cost" required placeholder="0" data-numeric><span class="field__err" id="err-landCost"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="constructionCost">Construction Cost <span class="req">*</span></label><input type="text" id="constructionCost" name="construction_cost" required placeholder="0" data-numeric><span class="field__err" id="err-constructionCost"></span></div>
-          <div class="field"><label for="otherCost">Other Costs</label><input type="text" id="otherCost" name="other_cost" placeholder="0" data-numeric><span class="field__err" id="err-otherCost"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="expectedRevenue">Expected Revenue <span class="req">*</span></label><input type="text" id="expectedRevenue" name="expected_revenue" required placeholder="0" data-numeric><span class="field__err" id="err-expectedRevenue"></span></div>
-          <div class="field"><label for="expectedSales">Expected Sales <span class="req">*</span></label><input type="text" id="expectedSales" name="expected_sales" required placeholder="0" data-numeric><span class="field__err" id="err-expectedSales"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="expectedRentalIncome">Rental Income (Annual)</label><input type="text" id="expectedRentalIncome" name="expected_rental_income" placeholder="0" data-numeric><span class="field__err" id="err-expectedRentalIncome"></span></div>
-          <div class="field"><label for="expectedExitValue">Exit Value <span class="req">*</span></label><input type="text" id="expectedExitValue" name="expected_exit_value" required placeholder="0" data-numeric><span class="field__err" id="err-expectedExitValue"></span></div>
-        </div>
-
-        <!-- Live Summary Box -->
-        <div class="live-summary" id="liveSummary">
-          <div class="live-summary__item"><span>Total Cost</span><strong id="lsTotalCost">—</strong></div>
-          <div class="live-summary__item"><span>Revenue</span><strong id="lsRevenue">—</strong></div>
-          <div class="live-summary__item live-summary__item--accent"><span>Net Spread</span><strong id="lsSpread">—</strong></div>
-          <div class="live-summary__item"><span>ROI</span><strong id="lsRoi">—</strong></div>
-        </div>
-      </div>
-
-      <!-- Section 3: Project Details -->
-      <div class="form-card">
-        <h2 class="form-card__title"><span class="form-card__num">03</span> Project Details</h2>
-        <div class="form-row">
-          <div class="field"><label for="constructionStart">Start Date <span class="req">*</span></label><input type="date" id="constructionStart" name="construction_start" required><span class="field__err" id="err-constructionStart"></span></div>
-          <div class="field"><label for="constructionEnd">End Date <span class="req">*</span></label><input type="date" id="constructionEnd" name="construction_end" required><span class="field__err" id="err-constructionEnd"></span></div>
-        </div>
-        <div class="form-row form-row--3">
-          <div class="field"><label for="fundingType">Funding Type <span class="req">*</span></label><select id="fundingType" name="funding_type" required><option value="">Select</option><option>Self-funded</option><option>Bank Loan</option><option>Joint Venture</option><option>Private Equity</option><option>Mixed</option></select><span class="field__err" id="err-fundingType"></span></div>
-          <div class="field"><label for="landOwnership">Land Ownership <span class="req">*</span></label><select id="landOwnership" name="land_ownership" required><option value="">Select</option><option>Freehold</option><option>Leasehold</option><option>Government Lease</option><option>Under Acquisition</option></select><span class="field__err" id="err-landOwnership"></span></div>
-          <div class="field"><label for="developerExperience">Developer Experience <span class="req">*</span></label><select id="developerExperience" name="developer_experience" required><option value="">Select</option><option>New</option><option>1-3 Projects</option><option>4-10 Projects</option><option>10+ Projects</option></select><span class="field__err" id="err-developerExperience"></span></div>
-        </div>
-      </div>
-
-      <!-- Section 4: Risk -->
-      <div class="form-card">
-        <h2 class="form-card__title"><span class="form-card__num">04</span> Risk Assessment</h2>
-        <div class="form-row form-row--3">
-          <div class="field"><label for="legalStatus">Legal Status <span class="req">*</span></label><select id="legalStatus" name="legal_status" required><option value="">Select</option><option>Clear Title</option><option>Pending Approval</option><option>Litigation</option><option>Encumbered</option></select><span class="field__err" id="err-legalStatus"></span></div>
-          <div class="field"><label for="siteCondition">Site Condition <span class="req">*</span></label><select id="siteCondition" name="site_condition" required><option value="">Select</option><option>Ready to Build</option><option>Requires Clearance</option><option>Requires Demolition</option></select><span class="field__err" id="err-siteCondition"></span></div>
-          <div class="field"><label for="environmentalRisk">Environmental Risk <span class="req">*</span></label><select id="environmentalRisk" name="environmental_risk" required><option value="">Select</option><option>Low</option><option>Medium</option><option>High</option></select><span class="field__err" id="err-environmentalRisk"></span></div>
-        </div>
-        <div class="form-row">
-          <div class="field"><label for="marketDemand">Market Demand <span class="req">*</span></label><select id="marketDemand" name="market_demand" required><option value="">Select</option><option>Low</option><option>Medium</option><option>High</option><option>Very High</option></select><span class="field__err" id="err-marketDemand"></span></div>
-          <div class="field"><label for="competitionLevel">Competition Level <span class="req">*</span></label><select id="competitionLevel" name="competition_level" required><option value="">Select</option><option>Low</option><option>Medium</option><option>High</option><option>Saturated</option></select><span class="field__err" id="err-competitionLevel"></span></div>
-        </div>
-      </div>
-
-      <!-- Section 5: Notes -->
-      <div class="form-card">
-        <h2 class="form-card__title"><span class="form-card__num">05</span> Notes</h2>
-        <div class="field"><label for="notes">Additional Notes</label><textarea id="notes" name="notes" rows="4" placeholder="Any context, caveats, comparable deals…"></textarea></div>
-      </div>
-
-      <!-- Submit -->
-      <div class="form-actions">
-        <button type="submit" class="btn btn--primary btn--lg" id="submitBtn">Submit Deal</button>
+      <div class="form-submit">
+        <button type="submit" class="btn btn--primary btn--lg" id="submitBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Submit Deal
+        </button>
       </div>
     </form>
   </div>
 </section>
 
-<!-- ==================== VIEW: DEALS ==================== -->
+<!-- ==================== VIEW: DEALS PIPELINE ==================== -->
 <section class="view" id="view-deals">
   <div class="container">
     <div class="page-header">
-      <div><h1 class="page-title">Deals Pipeline</h1><p class="page-subtitle">All submitted deals. Click any deal to view full details or download documents.</p></div>
-      <div class="page-header__actions">
-        <button class="btn btn--outline" id="refreshDealsBtn">↻ Refresh</button>
+      <div>
+        <h1 class="page-title">Deals Pipeline</h1>
+        <p class="page-subtitle">All submitted deals from Google Sheets. Click any deal to view details.</p>
+      </div>
+      <div class="page-header__right">
+        <button class="btn btn--refresh" id="refreshDealsBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
         <button class="btn btn--primary" id="gotoNewDealBtn">+ New Deal</button>
       </div>
     </div>
     <div class="filter-bar">
-      <input type="text" class="filter-bar__search" id="searchInput" placeholder="Search project, developer, location…">
-      <select class="filter-bar__select" id="filterType"><option value="">All Types</option><option>Residential</option><option>Commercial</option><option>Mixed-Use</option><option>Industrial</option><option>Hospitality</option></select>
-      <select class="filter-bar__select" id="filterSort"><option value="newest">Newest First</option><option value="cost-desc">Cost: High → Low</option><option value="cost-asc">Cost: Low → High</option></select>
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search deals…">
+      </div>
+      <select class="filter-select" id="filterType"><option value="">All Types</option><option>Residential</option><option>Commercial</option><option>Mixed-Use</option><option>Industrial</option><option>Hospitality</option></select>
+      <select class="filter-select" id="filterSort"><option value="newest">Newest</option><option value="cost-desc">Cost ↓</option><option value="cost-asc">Cost ↑</option></select>
     </div>
     <div class="deals-grid" id="dealsGrid"></div>
   </div>
 </section>
 
-<!-- ==================== VIEW: REPORTS ==================== -->
+<!-- ==================== VIEW: ANALYTICS ==================== -->
 <section class="view" id="view-reports">
   <div class="container">
     <div class="page-header">
-      <div><h1 class="page-title">Underwriting Analytics</h1><p class="page-subtitle">Portfolio distribution, capital allocation, and risk profiles.</p></div>
-      <button class="btn btn--outline" id="exportCsvBtn">Export CSV</button>
+      <div><h1 class="page-title">Portfolio Analytics</h1><p class="page-subtitle">Aggregated portfolio metrics and distribution charts.</p></div>
+      <button class="btn btn--outline" id="exportCsvBtn">⬇ Export CSV</button>
     </div>
-    <div class="reports-grid">
-      <div class="report-card"><h3>Asset Type Distribution</h3><div id="chartAsset"></div></div>
-      <div class="report-card"><h3>Funding Structure</h3><div id="chartFunding"></div></div>
-      <div class="report-card"><h3>Risk Profile</h3><div id="chartRisk"></div></div>
-      <div class="report-card report-card--wide">
+    <div class="analytics-grid">
+      <div class="analytics-card"><h3>Asset Type Distribution</h3><div id="chartAsset"></div></div>
+      <div class="analytics-card"><h3>Status Breakdown</h3><div id="chartStatus"></div></div>
+      <div class="analytics-card analytics-card--wide">
         <h3>Executive Summary</h3>
-        <div class="exec-grid">
-          <div class="exec-box"><span class="exec-box__val" id="execCap">$0</span><span class="exec-box__label">Total Capital</span></div>
-          <div class="exec-box"><span class="exec-box__val" id="execRev">$0</span><span class="exec-box__label">Total Revenue</span></div>
-          <div class="exec-box"><span class="exec-box__val" id="execSpread">$0</span><span class="exec-box__label">Avg Spread</span></div>
-          <div class="exec-box"><span class="exec-box__val" id="execRoi">0%</span><span class="exec-box__label">Avg ROI</span></div>
+        <div class="exec-row">
+          <div class="exec-box"><span class="exec-box__val" id="execCap">$0</span><span class="exec-box__lab">Total Capital</span></div>
+          <div class="exec-box"><span class="exec-box__val" id="execRev">$0</span><span class="exec-box__lab">Total Revenue</span></div>
+          <div class="exec-box"><span class="exec-box__val" id="execSpread">$0</span><span class="exec-box__lab">Net Spread</span></div>
+          <div class="exec-box"><span class="exec-box__val" id="execRoi">0%</span><span class="exec-box__lab">Avg ROI</span></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ==================== VIEW: SETTINGS ==================== -->
-<section class="view" id="view-settings">
-  <div class="container container--narrow">
-    <div class="page-header"><div><h1 class="page-title">Integration Settings</h1><p class="page-subtitle">Configure Google Sheets & n8n webhook endpoints.</p></div></div>
-    <div class="form-card">
-      <h2 class="form-card__title">Webhook & API Configuration</h2>
-      <div class="field" style="margin-bottom:16px;"><label for="cfgSubmitUrl">Submit Webhook URL</label><input type="text" id="cfgSubmitUrl" placeholder="https://n8n-scad.srv1492862.hstgr.cloud/webhook/..."></div>
-      <div class="field" style="margin-bottom:16px;"><label for="cfgGetDealsUrl">Get Deals URL</label><input type="text" id="cfgGetDealsUrl" placeholder="https://n8n-scad.srv1492862.hstgr.cloud/webhook/get-deals"></div>
-      <div class="field" style="margin-bottom:16px;"><label for="cfgSheetUrl">Google Sheet URL (optional — for PDF/PPT links)</label><input type="text" id="cfgSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
-      <div class="settings-actions">
-        <button class="btn btn--primary" id="saveSettingsBtn">Save Settings</button>
-        <button class="btn btn--outline" id="testConnBtn">Test Connection</button>
-        <button class="btn btn--ghost" id="resetSettingsBtn">Reset Defaults</button>
-      </div>
-      <div class="test-result" id="testResult" style="display:none;"></div>
-    </div>
-  </div>
-</section>
-
 <!-- ==================== DEAL DETAIL MODAL ==================== -->
-<div class="modal-overlay" id="modalOverlay" style="display:none;">
+<div class="modal-overlay" id="modalOverlay">
   <div class="modal" id="dealModal">
     <div class="modal__head">
       <div>
-        <span class="modal__badge" id="modalBadge">DEAL</span>
-        <h2 class="modal__title" id="modalTitle">Project Name</h2>
-        <p class="modal__sub" id="modalSub">Developer · Location</p>
+        <span class="modal__badge" id="modalBadge"></span>
+        <h2 class="modal__title" id="modalTitle"></h2>
+        <p class="modal__sub" id="modalSub"></p>
       </div>
       <button class="modal__close" id="modalCloseBtn">✕</button>
     </div>
     <div class="modal__body" id="modalBody"></div>
     <div class="modal__foot">
-      <button class="btn btn--outline" id="modalPrintBtn">Print</button>
-      <button class="btn btn--outline" id="modalExportBtn">Export JSON</button>
+      <button class="btn btn--ghost" id="modalPrintBtn">🖨 Print</button>
+      <button class="btn btn--ghost" id="modalExportBtn">⬇ JSON</button>
       <button class="btn btn--primary" id="modalCloseFootBtn">Close</button>
     </div>
   </div>
 </div>
 
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay" style="display:none;">
-  <div class="loading-box"><div class="spinner"></div><p>Submitting deal…</p></div>
+<!-- ==================== EDIT SECTIONS MODAL ==================== -->
+<div class="modal-overlay" id="editSectionsOverlay">
+  <div class="modal modal--edit">
+    <div class="modal__head">
+      <div><h2 class="modal__title">Edit Form Sections</h2><p class="modal__sub">Add, remove, or reorder form fields.</p></div>
+      <button class="modal__close" id="editSectionsCloseBtn">✕</button>
+    </div>
+    <div class="modal__body" id="editSectionsBody"></div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" id="resetSectionsBtn">Reset to Default</button>
+      <button class="btn btn--primary" id="saveSectionsBtn">Save Changes</button>
+    </div>
+  </div>
 </div>
 
-<!-- Toast Container -->
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box"><div class="spinner"></div><p>Processing…</p></div>
+</div>
+
+<!-- Toast -->
 <div class="toast-wrap" id="toastWrap"></div>
 
 <!-- Footer -->
-<footer class="footer"><span>Meridian Capital · Underwriting Platform v2.0</span><span>Powered by AI Automation</span></footer>
+<footer class="footer">
+  <span>© 2026 Meridian Capital · Real Estate Underwriting Platform</span>
+  <span>Powered by AI Automation</span>
+</footer>
 
+<script src="config.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
