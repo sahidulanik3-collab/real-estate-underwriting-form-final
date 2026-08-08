@@ -4,7 +4,7 @@
    ================================================================ */
 const CONFIG = {
   // n8n Webhook URL for submitting new deals
-  SUBMIT_WEBHOOK: 'https://n8n-scad.srv1492862.hstgr.cloud/webhook/19ee0d89-5430-444d-b1a7-a3493220a483',
+  SUBMIT_WEBHOOK: 'https://n8n-scad.srv1492862.hstgr.cloud/webhook-test/19ee0d89-5430-444d-b1a7-a3493220a483',
 
   // Google Sheet ID (from your sheet URL)
   GOOGLE_SHEET_ID: '1hWXh-LBh15Dqn9SjqkZbbcZCOxJvGNqydlvhkqhSMLQ',
