@@ -3,12 +3,20 @@
 /* ================================================================
    STATE & STORAGE
    ================================================================ */
-const STORAGE = { DEALS: 'mc_deals_v4', THEME: 'mc_theme', SECTIONS: 'mc_sections_v3' };
-const SYM = { BDT: '৳', USD: '$', EUR: '€', GBP: '£' };
+const STORAGE = { DEALS: 'mc_deals_v4', THEME: 'mc_theme', SECTIONS: 'mc_sections_v3', CURRENCY: 'mc_currency' };
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'BDT', symbol: '৳', name: 'Bangladeshi Taka' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+];
 
 const S = {
   view: 'dashboard',
   op: 'new', // 'new' or 'update'
+  currency: null, // { code, symbol, name }
   deals: [],
   submitting: false,
   currentDeal: null,
@@ -72,11 +80,13 @@ function fmtCommas(v) {
   const t = i.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return d !== undefined ? `${t || '0'}.${d}` : t;
 }
+function currSym() { return S.currency ? S.currency.symbol : '$'; }
 function fmtMoney(n) {
-  if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
-  return '$' + Math.round(n);
+  const s = currSym();
+  if (n >= 1e9) return s + (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return s + (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return s + (n / 1e3).toFixed(0) + 'K';
+  return s + Math.round(n);
 }
 function cleanNum(str) { return Number(String(str || '0').replace(/[^0-9.]/g, '')) || 0; }
 
@@ -101,6 +111,37 @@ function setTheme(t) { document.documentElement.dataset.theme = t; localStorage.
 $('themeBtn').addEventListener('click', () => {
   setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
+
+/* ================================================================
+   CURRENCY
+   ================================================================ */
+function loadCurrency() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE.CURRENCY));
+    S.currency = saved || CURRENCIES[0];
+  } catch { S.currency = CURRENCIES[0]; }
+}
+function setCurrency(code) {
+  const c = CURRENCIES.find(x => x.code === code) || CURRENCIES[0];
+  S.currency = c;
+  localStorage.setItem(STORAGE.CURRENCY, JSON.stringify(c));
+  // Re-render everything that shows money
+  updateLiveCalc();
+  updateStats();
+  if (S.view === 'deals') renderDeals();
+  if (S.view === 'reports') renderReports();
+  toast(`Currency: ${c.name} (${c.symbol})`, 'ok');
+}
+
+if ($('currencySelect')) {
+  CURRENCIES.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.code;
+    opt.textContent = `${c.symbol} ${c.code}`;
+    $('currencySelect').appendChild(opt);
+  });
+  $('currencySelect').addEventListener('change', e => setCurrency(e.target.value));
+}
 
 /* ================================================================
    RENDER FORM SECTIONS (Dynamic / Editable)
@@ -179,20 +220,22 @@ function renderFormSections() {
 
 function buildFieldHtml(f) {
   if (!f) return '';
+  const req = f.required ? 'required' : '';
+  const reqStar = f.required ? ' <span class="req-star">*</span>' : '';
   let inp = '';
   if (f.type === 'select') {
     const opts = (f.options || []).map(o => `<option value="${o}">${o || 'Select'}</option>`).join('');
-    inp = `<select id="f_${f.key}" name="${f.key}">${opts}</select>`;
+    inp = `<select id="f_${f.key}" name="${f.key}" ${req}>${opts}</select>`;
   } else if (f.type === 'textarea') {
-    inp = `<textarea id="f_${f.key}" name="${f.key}" rows="3" placeholder="${f.placeholder || ''}"></textarea>`;
+    inp = `<textarea id="f_${f.key}" name="${f.key}" rows="3" placeholder="${f.placeholder || ''}" ${req}></textarea>`;
   } else if (f.type === 'date') {
-    inp = `<input type="date" id="f_${f.key}" name="${f.key}">`;
+    inp = `<input type="date" id="f_${f.key}" name="${f.key}" ${req}>`;
   } else if (f.type === 'number') {
-    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || '0'}" data-numeric>`;
+    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || '0'}" data-numeric ${req}>`;
   } else {
-    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || ''}">`;
+    inp = `<input type="text" id="f_${f.key}" name="${f.key}" placeholder="${f.placeholder || ''}" ${req}>`;
   }
-  return `<div class="field"><label for="f_${f.key}">${f.label}</label>${inp}</div>`;
+  return `<div class="field"><label for="f_${f.key}">${f.label}${reqStar}</label>${inp}</div>`;
 }
 
 function attachNumericFormatting() {
@@ -221,14 +264,15 @@ function updateLiveCalc() {
   const spread = rev - total;
   const roi = total > 0 ? ((spread / total) * 100).toFixed(1) : '—';
 
-  if ($('lcCost')) $('lcCost').textContent = total > 0 ? '$' + fmtCommas(String(total)) : '—';
-  if ($('lcRev')) $('lcRev').textContent = rev > 0 ? '$' + fmtCommas(String(rev)) : '—';
-  if ($('lcSpread')) $('lcSpread').textContent = total > 0 && rev > 0 ? `${spread >= 0 ? '+' : '−'}$${fmtCommas(String(Math.abs(spread)))}` : '—';
+  const cs = currSym();
+  if ($('lcCost')) $('lcCost').textContent = total > 0 ? cs + fmtCommas(String(total)) : '—';
+  if ($('lcRev')) $('lcRev').textContent = rev > 0 ? cs + fmtCommas(String(rev)) : '—';
+  if ($('lcSpread')) $('lcSpread').textContent = total > 0 && rev > 0 ? `${spread >= 0 ? '+' : '−'}${cs}${fmtCommas(String(Math.abs(spread)))}` : '—';
   if ($('lcRoi')) $('lcRoi').textContent = roi !== '—' ? roi + '%' : '—';
 }
 
 /* ================================================================
-   EDIT SECTIONS MODAL
+   EDIT SECTIONS MODAL — Google Forms Style Builder
    ================================================================ */
 $('editSectionsBtn').addEventListener('click', openEditSections);
 $('editSectionsCloseBtn').addEventListener('click', closeEditSections);
@@ -240,56 +284,345 @@ function openEditSections() {
 }
 function closeEditSections() { $('editSectionsOverlay').classList.remove('is-open'); }
 
+/* ── Field type icons ── */
+const FIELD_TYPE_ICONS = {
+  text: '𝐓',
+  number: '#',
+  date: '📅',
+  textarea: '¶',
+  select: '▾',
+};
+const FIELD_TYPES = [
+  { value: 'text', label: 'Short Text', icon: '𝐓' },
+  { value: 'number', label: 'Number', icon: '#' },
+  { value: 'date', label: 'Date', icon: '📅' },
+  { value: 'textarea', label: 'Long Text', icon: '¶' },
+  { value: 'select', label: 'Dropdown', icon: '▾' },
+];
+
 function renderEditSections() {
   const body = $('editSectionsBody');
   body.innerHTML = '';
+
   S.sections.forEach((sec, si) => {
-    let html = `<div class="edit-section-item"><span class="edit-section-item__name">${sec.num}. ${sec.title}</span></div>`;
-    sec.fields.forEach((f, fi) => {
-      html += `<div class="edit-field-item"><span class="edit-field-item__label">${f.label} <small style="color:var(--text-3);">(${f.type})</small></span><button class="edit-field-item__del" data-si="${si}" data-fi="${fi}" title="Remove field">✕</button></div>`;
-    });
-    html += `<div class="add-field-row">
-      <input type="text" placeholder="Field label…" id="newLabel_${si}">
-      <select id="newType_${si}"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="textarea">Textarea</option></select>
-      <button class="btn btn--sm btn--gold" data-si="${si}" id="addFieldBtn_${si}">+ Add</button>
+    /* ── Section card ── */
+    const secBlock = document.createElement('div');
+    secBlock.className = 'gf-section';
+    secBlock.dataset.si = si;
+
+    // Section header
+    let secHead = `<div class="gf-section__head">
+      <div class="gf-section__head-left">
+        <span class="gf-section__num">${sec.num}</span>
+        <input class="gf-section__title" value="${escHtml(sec.title)}" data-si="${si}" data-role="sec-title" placeholder="Section title…" />
+      </div>
+      <div class="gf-section__head-actions">
+        ${si > 0 ? `<button class="gf-icon-btn" data-si="${si}" data-dir="up" title="Move Up">▲</button>` : ''}
+        ${si < S.sections.length - 1 ? `<button class="gf-icon-btn" data-si="${si}" data-dir="down" title="Move Down">▼</button>` : ''}
+        <button class="gf-icon-btn gf-icon-btn--del" data-si="${si}" data-role="del-sec" title="Delete Section">🗑</button>
+      </div>
     </div>`;
-    body.insertAdjacentHTML('beforeend', html);
+
+    // Field cards
+    let fieldsHtml = '';
+    sec.fields.forEach((f, fi) => {
+      fieldsHtml += buildFieldCard(si, fi, f, sec.fields.length);
+    });
+
+    // Add field button
+    let addBtn = `<div class="gf-add-field">
+      <button class="gf-add-field__btn" data-si="${si}" data-role="add-field">
+        <span class="gf-add-field__icon">+</span> Add field
+      </button>
+    </div>`;
+
+    secBlock.innerHTML = secHead + `<div class="gf-section__fields">${fieldsHtml}</div>` + addBtn;
+    body.appendChild(secBlock);
   });
 
-  // Bind delete buttons
-  body.querySelectorAll('.edit-field-item__del').forEach(btn => {
+  // Add section button
+  body.insertAdjacentHTML('beforeend', `
+    <button class="gf-add-section" id="addSectionBtn">
+      <span class="gf-add-section__icon">+</span>
+      <span>Add new section</span>
+    </button>
+  `);
+
+  bindEditEvents(body);
+}
+
+function escHtml(s) { return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function buildFieldCard(si, fi, f, totalFields) {
+  const typeOpts = FIELD_TYPES.map(t =>
+    `<option value="${t.value}" ${t.value === f.type ? 'selected' : ''}>${t.icon} ${t.label}</option>`
+  ).join('');
+
+  let preview = '';
+  if (f.type === 'text') preview = `<div class="gf-field__preview"><input type="text" placeholder="${escHtml(f.placeholder || 'Short answer text')}" disabled /></div>`;
+  else if (f.type === 'number') preview = `<div class="gf-field__preview"><input type="text" placeholder="${escHtml(f.placeholder || '0')}" disabled /></div>`;
+  else if (f.type === 'date') preview = `<div class="gf-field__preview"><input type="date" disabled /></div>`;
+  else if (f.type === 'textarea') preview = `<div class="gf-field__preview"><div class="gf-preview-textarea">Long answer text</div></div>`;
+  else if (f.type === 'select') {
+    let optsList = '';
+    (f.options || ['', 'Option 1']).forEach((opt, oi) => {
+      if (oi === 0) return; // skip empty first option
+      optsList += `<div class="gf-option-row">
+        <span class="gf-option-row__num">${oi}.</span>
+        <input class="gf-option-row__input" value="${escHtml(opt)}" data-si="${si}" data-fi="${fi}" data-oi="${oi}" data-role="edit-option" placeholder="Option ${oi}" />
+        <button class="gf-option-row__del" data-si="${si}" data-fi="${fi}" data-oi="${oi}" data-role="del-option" title="Remove">✕</button>
+      </div>`;
+    });
+    optsList += `<div class="gf-option-row gf-option-row--add">
+      <span class="gf-option-row__num">${(f.options || []).length}.</span>
+      <button class="gf-option-row__add-btn" data-si="${si}" data-fi="${fi}" data-role="add-option">+ Add option</button>
+    </div>`;
+    preview = `<div class="gf-field__options">${optsList}</div>`;
+  }
+
+  return `<div class="gf-field-card ${f._active ? 'gf-field-card--active' : ''}" data-si="${si}" data-fi="${fi}">
+    <div class="gf-field-card__drag" title="Drag to reorder">⠿</div>
+    <div class="gf-field-card__body">
+      <div class="gf-field-card__top">
+        <input class="gf-field-card__label" value="${escHtml(f.label)}" data-si="${si}" data-fi="${fi}" data-role="edit-label" placeholder="Question" />
+        <select class="gf-field-card__type" data-si="${si}" data-fi="${fi}" data-role="change-type">${typeOpts}</select>
+      </div>
+      ${preview}
+      <div class="gf-field-card__bottom">
+        <input class="gf-field-card__placeholder" value="${escHtml(f.placeholder || '')}" data-si="${si}" data-fi="${fi}" data-role="edit-placeholder" placeholder="Placeholder text (optional)" />
+        <div class="gf-field-card__controls">
+          <label class="gf-toggle" title="Required">
+            <input type="checkbox" data-si="${si}" data-fi="${fi}" data-role="toggle-required" ${f.required ? 'checked' : ''} />
+            <span class="gf-toggle__slider"></span>
+            <span class="gf-toggle__label">Required</span>
+          </label>
+          <div class="gf-field-card__actions">
+            ${fi > 0 ? `<button class="gf-field-btn" data-si="${si}" data-fi="${fi}" data-dir="up" title="Move Up">↑</button>` : ''}
+            ${fi < totalFields - 1 ? `<button class="gf-field-btn" data-si="${si}" data-fi="${fi}" data-dir="down" title="Move Down">↓</button>` : ''}
+            <button class="gf-field-btn" data-si="${si}" data-fi="${fi}" data-role="dup-field" title="Duplicate">⧉</button>
+            <button class="gf-field-btn gf-field-btn--del" data-si="${si}" data-fi="${fi}" data-role="del-field" title="Delete">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Bind all events inside edit modal ── */
+function bindEditEvents(body) {
+  // Section title edits
+  body.querySelectorAll('[data-role="sec-title"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      S.sections[Number(inp.dataset.si)].title = inp.value.trim() || 'Untitled';
+    });
+  });
+
+  // Section move
+  body.querySelectorAll('.gf-icon-btn[data-dir]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si);
+      const dir = btn.dataset.dir;
+      const target = dir === 'up' ? si - 1 : si + 1;
+      if (target < 0 || target >= S.sections.length) return;
+      [S.sections[si], S.sections[target]] = [S.sections[target], S.sections[si]];
+      S.sections.forEach((s, i) => s.num = String(i + 1).padStart(2, '0'));
+      renderEditSections();
+    });
+  });
+
+  // Section delete
+  body.querySelectorAll('[data-role="del-sec"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const si = Number(btn.dataset.si);
-      const fi = Number(btn.dataset.fi);
+      if (S.sections.length <= 1) { toast('At least one section required', 'err'); return; }
+      if (!confirm(`Delete section "${S.sections[si].title}"?`)) return;
+      S.sections.splice(si, 1);
+      S.sections.forEach((s, i) => s.num = String(i + 1).padStart(2, '0'));
+      renderEditSections();
+    });
+  });
+
+  // Field label edits (live)
+  body.querySelectorAll('[data-role="edit-label"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const si = Number(inp.dataset.si), fi = Number(inp.dataset.fi);
+      const label = inp.value.trim() || 'Untitled';
+      S.sections[si].fields[fi].label = label;
+      S.sections[si].fields[fi].key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    });
+  });
+
+  // Placeholder edits
+  body.querySelectorAll('[data-role="edit-placeholder"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      S.sections[Number(inp.dataset.si)].fields[Number(inp.dataset.fi)].placeholder = inp.value.trim();
+    });
+  });
+
+  // Type change
+  body.querySelectorAll('[data-role="change-type"]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      syncAllLabels();
+      const si = Number(sel.dataset.si), fi = Number(sel.dataset.fi);
+      const f = S.sections[si].fields[fi];
+      f.type = sel.value;
+      if (sel.value === 'select' && (!f.options || f.options.length < 2)) {
+        f.options = ['', 'Option 1', 'Option 2'];
+      }
+      renderEditSections();
+    });
+  });
+
+  // Required toggle
+  body.querySelectorAll('[data-role="toggle-required"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      S.sections[Number(cb.dataset.si)].fields[Number(cb.dataset.fi)].required = cb.checked;
+    });
+  });
+
+  // Field move
+  body.querySelectorAll('.gf-field-btn[data-dir]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si), fi = Number(btn.dataset.fi);
+      const dir = btn.dataset.dir;
+      const target = dir === 'up' ? fi - 1 : fi + 1;
+      const fields = S.sections[si].fields;
+      if (target < 0 || target >= fields.length) return;
+      [fields[fi], fields[target]] = [fields[target], fields[fi]];
+      renderEditSections();
+    });
+  });
+
+  // Field duplicate
+  body.querySelectorAll('[data-role="dup-field"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si), fi = Number(btn.dataset.fi);
+      const dup = JSON.parse(JSON.stringify(S.sections[si].fields[fi]));
+      dup.label += ' (copy)';
+      dup.key += '_copy';
+      S.sections[si].fields.splice(fi + 1, 0, dup);
+      renderEditSections();
+    });
+  });
+
+  // Field delete
+  body.querySelectorAll('[data-role="del-field"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const si = Number(btn.dataset.si), fi = Number(btn.dataset.fi);
       S.sections[si].fields.splice(fi, 1);
       renderEditSections();
     });
   });
 
-  // Bind add buttons
-  S.sections.forEach((sec, si) => {
-    const addBtn = $(`addFieldBtn_${si}`);
-    if (addBtn) {
-      addBtn.addEventListener('click', () => {
-        const label = $(`newLabel_${si}`).value.trim();
-        const type = $(`newType_${si}`).value;
-        if (!label) return;
-        const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-        S.sections[si].fields.push({ key, label, type, placeholder: '' });
-        renderEditSections();
+  // Add field
+  body.querySelectorAll('[data-role="add-field"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si);
+      const num = S.sections[si].fields.length + 1;
+      S.sections[si].fields.push({
+        key: 'field_' + Date.now(),
+        label: 'Untitled Field',
+        type: 'text',
+        placeholder: '',
+        required: false,
       });
+      renderEditSections();
+      // Scroll to bottom of section
+      setTimeout(() => {
+        const cards = body.querySelectorAll(`.gf-section[data-si="${si}"] .gf-field-card`);
+        if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    });
+  });
+
+  // Dropdown: edit option
+  body.querySelectorAll('[data-role="edit-option"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const si = Number(inp.dataset.si), fi = Number(inp.dataset.fi), oi = Number(inp.dataset.oi);
+      S.sections[si].fields[fi].options[oi] = inp.value.trim() || `Option ${oi}`;
+    });
+  });
+
+  // Dropdown: delete option
+  body.querySelectorAll('[data-role="del-option"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si), fi = Number(btn.dataset.fi), oi = Number(btn.dataset.oi);
+      const opts = S.sections[si].fields[fi].options;
+      if (opts.length <= 2) { toast('Dropdown needs at least 1 option', 'err'); return; }
+      opts.splice(oi, 1);
+      renderEditSections();
+    });
+  });
+
+  // Dropdown: add option
+  body.querySelectorAll('[data-role="add-option"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncAllLabels();
+      const si = Number(btn.dataset.si), fi = Number(btn.dataset.fi);
+      const opts = S.sections[si].fields[fi].options;
+      opts.push(`Option ${opts.length}`);
+      renderEditSections();
+    });
+  });
+
+  // Add section
+  const addSecBtn = $('addSectionBtn');
+  if (addSecBtn) {
+    addSecBtn.addEventListener('click', () => {
+      syncAllLabels();
+      const num = String(S.sections.length + 1).padStart(2, '0');
+      S.sections.push({ id: 'custom_' + Date.now(), title: 'Untitled Section', num, fields: [] });
+      renderEditSections();
+      // Scroll to new section
+      setTimeout(() => {
+        const secs = body.querySelectorAll('.gf-section');
+        if (secs.length) secs[secs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    });
+  }
+}
+
+/* Sync all label/placeholder inputs back to state before re-render */
+function syncAllLabels() {
+  $$('[data-role="sec-title"]').forEach(inp => {
+    S.sections[Number(inp.dataset.si)].title = inp.value.trim() || 'Untitled';
+  });
+  $$('[data-role="edit-label"]').forEach(inp => {
+    const si = Number(inp.dataset.si), fi = Number(inp.dataset.fi);
+    if (S.sections[si] && S.sections[si].fields[fi]) {
+      S.sections[si].fields[fi].label = inp.value.trim() || 'Untitled';
+      S.sections[si].fields[fi].key = (inp.value.trim() || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    }
+  });
+  $$('[data-role="edit-placeholder"]').forEach(inp => {
+    const si = Number(inp.dataset.si), fi = Number(inp.dataset.fi);
+    if (S.sections[si] && S.sections[si].fields[fi]) {
+      S.sections[si].fields[fi].placeholder = inp.value.trim();
+    }
+  });
+  $$('[data-role="edit-option"]').forEach(inp => {
+    const si = Number(inp.dataset.si), fi = Number(inp.dataset.fi), oi = Number(inp.dataset.oi);
+    if (S.sections[si] && S.sections[si].fields[fi] && S.sections[si].fields[fi].options) {
+      S.sections[si].fields[fi].options[oi] = inp.value.trim();
     }
   });
 }
 
 $('saveSectionsBtn').addEventListener('click', () => {
+  syncAllLabels();
   saveSections();
   renderFormSections();
   closeEditSections();
-  toast('Form sections updated!', 'ok');
+  toast('Form sections saved!', 'ok');
 });
 
 $('resetSectionsBtn').addEventListener('click', () => {
+  if (!confirm('Reset all sections to default? Custom fields will be lost.')) return;
   S.sections = JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
   saveSections();
   renderFormSections();
@@ -411,13 +744,7 @@ async function loadDeals(showToast = false) {
     });
   });
 
-  // Merge local storage deals
-  const local = getLocalDeals();
-  local.forEach(d => {
-    if (!d.deal_id) return;
-    if (!map.has(d.deal_id)) map.set(d.deal_id, d);
-  });
-
+  // Only show deals from Google Sheet — do NOT merge local storage deals into pipeline
   S.deals = Array.from(map.values());
 
   updateStats();
@@ -616,6 +943,14 @@ function buildPayload() {
 $('dealForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   if (S.submitting) return;
+
+  // Validate: if update mode, must select a deal
+  if (S.op === 'update' && !$('dealIdSelect').value) {
+    toast('Please select a deal to update first!', 'err');
+    $('dealIdSelect').focus();
+    return;
+  }
+
   const payload = buildPayload();
   S.submitting = true;
   $('submitBtn').disabled = true;
@@ -631,16 +966,20 @@ $('dealForm').addEventListener('submit', async (ev) => {
     if (r.ok) ok = true;
   } catch (e) { console.warn('Submit error:', e); }
 
-  saveLocalDeal(payload);
   S.submitting = false;
   $('submitBtn').disabled = false;
   $('loadingOverlay').classList.remove('is-open');
 
-  toast(ok ? `Deal ${payload.deal_id} submitted!` : `Deal ${payload.deal_id} saved locally`, 'ok');
-  $('dealForm').reset();
-  updateLiveCalc();
-  loadDeals();
-  switchView('deals');
+  if (ok) {
+    toast(`Deal ${payload.deal_id} ${S.op === 'update' ? 'updated' : 'submitted'} to n8n!`, 'ok');
+    $('dealForm').reset();
+    updateLiveCalc();
+    // Refresh from sheet after a short delay to let n8n process
+    setTimeout(() => loadDeals(true), 3000);
+    switchView('deals');
+  } else {
+    toast(`Submission failed — check your webhook or internet connection`, 'err');
+  }
 });
 
 /* ================================================================
@@ -694,6 +1033,7 @@ function renderDeals() {
 
     const card = document.createElement('div');
     card.className = 'deal-card';
+    const cs = currSym();
     card.innerHTML = `
       <div class="deal-card__top">
         <span class="deal-card__id">${d.deal_id || '—'}</span>
@@ -705,12 +1045,15 @@ function renderDeals() {
         ${d.location || '—'} · ${d.property_type || '—'}
       </div>
       <dl class="deal-card__nums">
-        <div><dt>Total Cost</dt><dd>$${fmtCommas(String(cost))}</dd></div>
-        <div><dt>Revenue</dt><dd>$${fmtCommas(String(rev))}</dd></div>
+        <div><dt>Total Cost</dt><dd>${cs}${fmtCommas(String(cost))}</dd></div>
+        <div><dt>Revenue</dt><dd>${cs}${fmtCommas(String(rev))}</dd></div>
       </dl>
       ${scoreBadge}
       ${downloads}
-      <div class="deal-card__arrow">View Details →</div>
+      <div class="deal-card__foot">
+        <span class="deal-card__arrow" onclick="event.stopPropagation(); openModal('${d.deal_id}')">View Details →</span>
+        <button class="deal-card__del" onclick="event.stopPropagation(); deleteDeal('${d.deal_id}')" title="Delete deal">🗑</button>
+      </div>
     `;
     card.addEventListener('click', () => openModal(d.deal_id));
     grid.appendChild(card);
@@ -754,10 +1097,11 @@ function openModal(id) {
   }
 
   // ── Financial Summary Row ──
+  const cs = currSym();
   html += `<div class="exec-row" style="margin-bottom:24px;">
-    <div class="exec-box"><span class="exec-box__val">$${fmtCommas(String(cost))}</span><span class="exec-box__lab">Total Cost</span></div>
-    <div class="exec-box"><span class="exec-box__val">$${fmtCommas(String(rev))}</span><span class="exec-box__lab">Revenue</span></div>
-    <div class="exec-box"><span class="exec-box__val" style="color:var(--green)">$${fmtCommas(String(profit))}</span><span class="exec-box__lab">Profit</span></div>
+    <div class="exec-box"><span class="exec-box__val">${cs}${fmtCommas(String(cost))}</span><span class="exec-box__lab">Total Cost</span></div>
+    <div class="exec-box"><span class="exec-box__val">${cs}${fmtCommas(String(rev))}</span><span class="exec-box__lab">Revenue</span></div>
+    <div class="exec-box"><span class="exec-box__val" style="color:var(--green)">${cs}${fmtCommas(String(profit))}</span><span class="exec-box__lab">Profit</span></div>
     <div class="exec-box"><span class="exec-box__val">${roi}%</span><span class="exec-box__lab">ROI</span></div>
   </div>`;
 
@@ -850,6 +1194,23 @@ $('modalExportBtn').addEventListener('click', () => {
 });
 
 /* ================================================================
+   DELETE DEAL
+   ================================================================ */
+function deleteDeal(dealId) {
+  if (!confirm(`Delete deal ${dealId}? This will remove it from the local view.\n\nNote: To permanently delete from Google Sheet, do it directly in the sheet.`)) return;
+  // Remove from local storage
+  const local = getLocalDeals().filter(d => d.deal_id !== dealId);
+  localStorage.setItem(STORAGE.DEALS, JSON.stringify(local));
+  // Remove from current state
+  S.deals = S.deals.filter(d => d.deal_id !== dealId);
+  updateStats();
+  updateNextDealId();
+  renderDeals();
+  closeModal();
+  toast(`Deal ${dealId} removed`, 'ok');
+}
+
+/* ================================================================
    REPORTS
    ================================================================ */
 function renderReports() {
@@ -917,6 +1278,8 @@ function toast(msg, type = 'ok') {
    ================================================================ */
 function init() {
   setTheme(localStorage.getItem(STORAGE.THEME) || 'light');
+  loadCurrency();
+  if ($('currencySelect')) $('currencySelect').value = S.currency.code;
   loadSections();
   renderFormSections();
   updateLiveCalc();
