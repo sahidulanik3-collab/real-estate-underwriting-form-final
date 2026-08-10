@@ -646,37 +646,70 @@ async function fetchSheetCsv(gid) {
 }
 
 function parseCsv(csvText) {
-  const lines = csvText.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = parseCsvRow(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+  if (!csvText || !csvText.trim()) return [];
+
+  const rows = [];
+  let curRow = [];
+  let curCell = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const c = csvText[i];
+    const next = csvText[i + 1];
+
+    if (c === '"') {
+      if (inQuotes && next === '"') {
+        curCell += '"';
+        i++; // skip escaped quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      curRow.push(curCell.trim());
+      curCell = '';
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') i++; // skip \r\n
+      curRow.push(curCell.trim());
+      if (curRow.some(cell => cell.length > 0)) {
+        rows.push(curRow);
+      }
+      curRow = [];
+      curCell = '';
+    } else {
+      curCell += c;
+    }
+  }
+  if (curCell.length > 0 || curRow.length > 0) {
+    curRow.push(curCell.trim());
+    if (curRow.some(cell => cell.length > 0)) {
+      rows.push(curRow);
+    }
+  }
+
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.replace(/^"|"$/g, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+
   const deals = [];
-  for (let i = 1; i < lines.length; i++) {
-    const row = parseCsvRow(lines[i]);
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
     if (row.length === 0) continue;
+
     const d = {};
     headers.forEach((h, idx) => {
       if (!h) return;
       let val = (row[idx] || '').replace(/^"|"$/g, '').trim();
       d[h] = val;
     });
-    // Skip formula/instruction rows (rows without a proper Deal_ID)
-    if (!d.deal_id || d.deal_id.length > 20 || d.deal_id.includes('FORMULA') || d.deal_id.includes('VIEW') || d.deal_id.includes('AI ')) continue;
+
+    const did = (d.deal_id || '').trim();
+    if (!did || did.length > 20) continue;
+    if (/^[.\-•*\s]/.test(did)) continue; // skip bullet points or sentences parsed as deal_id
+    if (did.includes('FORMULA') || did.includes('VIEW') || did.includes('AI ') || did.includes('Financing')) continue;
+
     deals.push(d);
   }
   return deals;
-}
-
-function parseCsvRow(str) {
-  const result = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    if (c === '"') { inQ = !inQ; }
-    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
-    else { cur += c; }
-  }
-  result.push(cur);
-  return result;
 }
 
 /* ================================================================
@@ -744,8 +777,8 @@ async function loadDeals(showToast = false) {
     });
   });
 
-  // Only show deals from Google Sheet — do NOT merge local storage deals into pipeline
-  S.deals = Array.from(map.values());
+  // Only show valid deals from Google Sheet with a proper deal_id and basic info
+  S.deals = Array.from(map.values()).filter(d => d.deal_id && (d.project_name || d.location || d.total_cost || d.land_cost));
 
   updateStats();
   updateNextDealId();
